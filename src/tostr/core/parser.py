@@ -17,7 +17,7 @@ class BaseParser(ABC):
     def __init__(self, project_dir: str, llm=None, registry: Registry=None):
         self.llm = llm
         self.registry = registry
-        self.path_ignore = ["venv", ".venv", "env", ".env", "build", "dist", "__pycache__", ".tostr", ".git"]
+        # self.path_ignore = ["venv", ".venv", "env", ".env", "build", "dist", "__pycache__", ".tostr", ".git"]
     
     @property
     def files(self):
@@ -45,7 +45,7 @@ class BaseParser(ABC):
             logger.debug(f"Created registry root: {root}")
             self.registry.add_struct(root)
             for path in subpath.glob("*"):
-                if any(part in path.parts for part in self.path_ignore):
+                if any(part in path.parts for part in self.registry.config.path_ignore):
                     continue
                 if path.is_dir():
                     logger.debug(f"🔍 Parsing directory '{path}'")
@@ -70,9 +70,17 @@ class BaseParser(ABC):
     # @abstractmethod
     def parse_file(self, subpath: Path, parent: BaseStruct=None) -> BaseFile:
         logger.debug(f"Attempting to resolve builder for suffix {subpath.parts[-1]}")
+        if any(part in subpath.parts for part in self.registry.config.path_ignore):
+            logger.debug(f"Skipping '{subpath}' due to path ignore rules")
+            return None
+        if subpath.suffix in self.registry.config.path_ignore or not subpath.suffix:
+            logger.debug(f"Skipping '{subpath}' due to path ignore rules")
+            return None
+
         try:
             builder = StructBuilderProvider.get_builder(subpath.suffix, self.registry)
         except LanguageNotSupportedError as e:
+            logger.warning(str(e))
             return None
         file_obj = builder.build_file().from_path(subpath, parent=parent)
         # logger.debug(json.dumps(file_obj.to_dict(), indent=2))

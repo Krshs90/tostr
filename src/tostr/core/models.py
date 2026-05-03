@@ -205,7 +205,8 @@ class Directory(BaseStruct):
             logger.error(f"{self} has no path")
             return
         for path in self.path.glob("*"):
-                if any(part in path.parts for part in ["venv", ".venv", "env", ".env", "build", "dist", "__pycache__", ".tostr", ".DS_Store", ".git"]):
+                if any(part in path.parts for part in self.registry.config.path_ignore):
+                    logger.debug(f"Skipping '{path}' due to path ignore rules")
                     continue
                 if path.is_dir():
                     logger.debug(f"🔍 Parsing directory '{path}'")
@@ -217,6 +218,12 @@ class Directory(BaseStruct):
                 else:
                     logger.debug(f"Attempting to resolve builder for suffix {path.parts[-1]}")
                     try:
+                        if any(part in path.parts for part in self.registry.config.path_ignore):
+                            logger.debug(f"Skipping '{path}' due to path ignore rules")
+                            continue
+                        if path.suffix in self.registry.config.path_ignore or not path.suffix:
+                            logger.debug(f"Skipping '{path}' due to path ignore rules")
+                            continue
                         builder = StructBuilderProvider.get_builder(path.suffix, self.registry)
                     except LanguageNotSupportedError as e:
                         continue

@@ -4,6 +4,7 @@ from pathlib import Path
 from tostr.core.models import BaseFile, BaseClass, BaseMethod, BaseField
 from tostr.core.db import SQLiteCache
 from tostr.core.builders import BaseBuilder
+from tostr.core.context.config import ProjectConfig
 
 import json
 from loguru import logger
@@ -19,6 +20,7 @@ class Registry:
         self.id_map: Dict[str, BaseStruct] = {}
         self.root: Optional[BaseStruct] = None
         self.db = db
+        self.config = ProjectConfig(project_path / ".tostr") if project_path else None
     
     @property
     def files(self) -> List[BaseFile]:
