@@ -120,6 +120,14 @@ def init(
             help="Load cache if it exists"
             )
         ] = True,
+    ignore: Annotated[
+        str,
+        typer.Option(
+            "--ignore",
+            "-i",
+            help="Add a default ignore template to the project folder (e.g., 'java', 'default')"
+        )
+    ] = None,
     debug: Annotated[
         bool, 
         typer.Option(
@@ -133,7 +141,7 @@ def init(
     configure_cli_logging(debug)
     start_time = time.perf_counter()
     try:
-        asyncio.run(init_async(path, use_cache))
+        asyncio.run(init_async(path, use_cache, ignore))
     except ToasterError as e:
         typer.secho(f"❌ Error: {e}", fg="red", err=True)
         raise typer.Exit(code=1)

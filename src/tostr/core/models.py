@@ -194,8 +194,9 @@ class BaseStruct(ABC):
 class Directory(BaseStruct):
     _IDPREFIX: ClassVar[str] = "D"
     
-    def __init__(self, path, registry=None, parent=None):
-        super().__init__(name=path.name, path=path, uid=str(path), registry=registry, parent=parent)
+    def __init__(self, path, registry=None, parent=None, uid=None):
+        uid = uid or str(path)
+        super().__init__(name=path.name, path=path, uid=uid, registry=registry, parent=parent)
     
     async def resolve_description_async(self, llm: "LLMClient", visited: set[str] = None):
         pass
@@ -204,10 +205,17 @@ class Directory(BaseStruct):
         if self.path is None:
             logger.error(f"{self} has no path")
             return
-        for path in self.path.glob("*"):
-                if any(part in path.parts for part in self.registry.config.path_ignore):
-                    logger.debug(f"Skipping '{path}' due to path ignore rules")
-                    continue
+        
+        # Ensure we use an absolute path for globbing if it's relative
+        full_path = self.path
+        if not full_path.is_absolute() and self.registry:
+            full_path = self.registry.project_path / self.path
+
+        for path in full_path.glob("*"):
+            if self.registry.config.is_ignored(path):
+                logger.debug(f"Skipping '{path}' due to path ignore rules")
+                continue
+            else:
                 if path.is_dir():
                     logger.debug(f"🔍 Parsing directory '{path}'")
                     relative_path = self.registry.relative_to_project(path)
@@ -218,10 +226,7 @@ class Directory(BaseStruct):
                 else:
                     logger.debug(f"Attempting to resolve builder for suffix {path.parts[-1]}")
                     try:
-                        if any(part in path.parts for part in self.registry.config.path_ignore):
-                            logger.debug(f"Skipping '{path}' due to path ignore rules")
-                            continue
-                        if path.suffix in self.registry.config.path_ignore or not path.suffix:
+                        if self.registry.config.is_ignored(path):
                             logger.debug(f"Skipping '{path}' due to path ignore rules")
                             continue
                         builder = StructBuilderProvider.get_builder(path.suffix, self.registry)

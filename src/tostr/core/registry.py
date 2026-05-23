@@ -20,7 +20,7 @@ class Registry:
         self.id_map: Dict[str, BaseStruct] = {}
         self.root: Optional[BaseStruct] = None
         self.db = db
-        self.config = ProjectConfig(project_path / ".tostr") if project_path else None
+        self.config = ProjectConfig(project_path) if project_path else None
     
     @property
     def files(self) -> List[BaseFile]:
@@ -89,6 +89,7 @@ class Registry:
                 instance = builder.with_type(struct_type=struct_type).from_dict(struct_data)
                 
                 if instance:
+                    instance.id = str(struct_data['id'])
                     self.add_struct(instance)
             
             logger.debug(f"Found {len(node_rows)} structs in subtree {path_str}")
@@ -190,6 +191,7 @@ class Registry:
                     instance = builder.with_type(struct_type=struct_type).from_dict(struct_data)
                     
                     if instance:
+                        instance.id = current_id
                         self.add_struct(instance)
                         # logger.debug(f"Created instance for struct with DB UID {struct_data['uid']} and type {struct_type}")
                     else:
