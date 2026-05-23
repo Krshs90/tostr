@@ -30,6 +30,11 @@ def clean_db(target_path: Path):
         logger.info("Database cleaned.")
     else:
         logger.warning("No database found to clean.")
+    
+    ignore_file = target_path / ".tostrignore"
+    if ignore_file.exists():
+        ignore_file.unlink()
+        logger.info(f"Deleted {ignore_file}")
 
 async def _build_ast_async(target_path: Path, use_cache: bool = True) -> BaseParser:
     llm = get_llm_client()
@@ -43,9 +48,33 @@ async def _build_ast_async(target_path: Path, use_cache: bool = True) -> BasePar
     logger.success("✅ Parsed files")
     return parser
 
-async def init_async(target_path: Path, use_cache: bool = True):
+def _write_default_ignore(target_path: Path, ignore_type: str):
+    base_path = Path(__file__).parent / "languages"
+    if ignore_type == "default":
+        template_path = base_path / "default.tostrignore"
+    else:
+        template_path = base_path / ignore_type / "default.tostrignore"
+    
+    if template_path.exists():
+        ignore_file = target_path / ".tostrignore"
+        with open(template_path, 'r') as f:
+            content = f.read()
+        
+        mode = 'a' if ignore_file.exists() else 'w'
+        with open(ignore_file, mode) as f:
+            if mode == 'a':
+                f.write("\n")
+            f.write(content)
+        logger.info(f"Written default ignore for {ignore_type} to {ignore_file}")
+    else:
+        logger.warning(f"No default ignore template found for {ignore_type} at {template_path}")
+
+async def init_async(target_path: Path, use_cache: bool = True, ignore: str = None):
     """Core asynchronous logic for scraping and parsing."""
     
+    if ignore:
+        _write_default_ignore(target_path, ignore)
+
     # Parse and resolve AST
     parser = await _build_ast_async(target_path, use_cache=use_cache)
         

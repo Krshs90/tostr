@@ -15,9 +15,10 @@ from tostr.exceptions import LanguageNotSupportedError
 
 class BaseParser(ABC):
     def __init__(self, project_dir: str, llm=None, registry: Registry=None):
+        self.project_dir = project_dir
         self.llm = llm
         self.registry = registry
-        self.path_ignore = ["venv", ".venv", "env", ".env", "build", "dist", "__pycache__", ".tostr", ".git"]
+        # self.path_ignore = ["venv", ".venv", "env", ".env", "build", "dist", "__pycache__", ".tostr", ".git"]
     
     @property
     def files(self):
@@ -27,7 +28,7 @@ class BaseParser(ABC):
     
     async def parse(self, subpath: Path = None):
         if not subpath:
-            subpath = Path(".")
+            subpath = Path(self.project_dir)
         if not isinstance(subpath, Path):
             subpath = Path(subpath)
 
@@ -40,12 +41,19 @@ class BaseParser(ABC):
     def parse_path(self, subpath: Path = None):
         if subpath.is_dir():
             logger.debug(f"🔍 Parsing files in '{subpath}'")
-            root = Directory(path=subpath, registry=self.registry)
+            
+            # Use relative path for root UID if possible
+            root_path = subpath
+            if self.registry:
+                root_path = self.registry.relative_to_project(subpath)
+                
+            root = Directory(path=root_path, registry=self.registry)
             self.registry.root = root
             logger.debug(f"Created registry root: {root}")
             self.registry.add_struct(root)
             for path in subpath.glob("*"):
-                if any(part in path.parts for part in self.path_ignore):
+                if self.registry.config.is_ignored(path):
+                    logger.debug(f"Skipping '{path}' due to path ignore rules")
                     continue
                 if path.is_dir():
                     logger.debug(f"🔍 Parsing directory '{path}'")
@@ -70,9 +78,14 @@ class BaseParser(ABC):
     # @abstractmethod
     def parse_file(self, subpath: Path, parent: BaseStruct=None) -> BaseFile:
         logger.debug(f"Attempting to resolve builder for suffix {subpath.parts[-1]}")
+        if self.registry.config.is_ignored(subpath):
+            logger.debug(f"Skipping '{subpath}' due to path ignore rules")
+            return None
+
         try:
             builder = StructBuilderProvider.get_builder(subpath.suffix, self.registry)
         except LanguageNotSupportedError as e:
+            logger.warning(str(e))
             return None
         file_obj = builder.build_file().from_path(subpath, parent=parent)
         # logger.debug(json.dumps(file_obj.to_dict(), indent=2))

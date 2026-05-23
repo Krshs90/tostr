@@ -40,7 +40,7 @@ def _run_watcher_thread(target_path: Path):
         logger.info("Background watcher shut down cleanly.")
 
 @mcp.tool()
-async def init(workspace_path: str, use_cache: bool = True) -> str:
+async def init(workspace_path: str, use_cache: bool = True, ignore: str = None) -> str:
     """
     -- MUST BE RUN BEFORE ANY OTHER TOOL --
     Initializes the Toaster MCP server for a specific project workspace. 
@@ -48,6 +48,7 @@ async def init(workspace_path: str, use_cache: bool = True) -> str:
     Args:
         workspace_path: The ABSOLUTE path to the project workspace. DO NOT use '.' or relative paths. If you only have a relative path, you must determine the absolute path of the current workspace first.
         use_cache: Whether to use the existing AST cache.
+        ignore: Add a default ignore template to the project folder (e.g., 'java', 'default').
     """
     
     target_path = Path(workspace_path)
@@ -72,7 +73,7 @@ async def init(workspace_path: str, use_cache: bool = True) -> str:
     try:
         configure_mcp_logging(project_dir)
         
-        await init_async(project_dir, use_cache)
+        await init_async(project_dir, use_cache, ignore)
 
         watcher_thread = threading.Thread(
             target=_run_watcher_thread,

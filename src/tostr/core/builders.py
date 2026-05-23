@@ -134,6 +134,6 @@ class DirectoryBuilder(BaseStructBuilder):
     def from_dict(self, d: dict) -> Directory:
         path = self.registry.relative_to_project(Path(d.get("path", ".")))
         # logger.debug(f"Building Directory from dict with path: {path}")
-        return Directory(path=path, registry=self.registry)
+        return Directory(path=path, registry=self.registry, uid=d.get("uid"))
 
     

@@ -209,8 +209,8 @@ __marimo__/
 */DS_Store
 .DS_Store
 
-/tests/test_code/*
-
 *.vscode
 
 *.sln
+
+tests/testcode/*

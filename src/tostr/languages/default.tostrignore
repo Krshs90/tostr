@@ -1,0 +1,25 @@
+# Generic Tostr Ignores
+/build/
+/dist/
+/out/
+/bin/
+
+# Binary / System Ignores
+.DS_Store
+*.exe
+*.bin
+*.dll
+*.so
+*.dylib
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+.git/
+.svn/
+.hg/
+.tostr/
+.tostrignore
+
+*.log
+*.tmp

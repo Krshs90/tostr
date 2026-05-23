@@ -16,8 +16,12 @@ dependencies = [
     "typer",
     "watchfiles",
     "loguru",
-    "fastmcp"
+    "fastmcp",
+    "pathspec"
 ]
 
 [project.scripts]
 tostr = "tostr.cli:app"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
