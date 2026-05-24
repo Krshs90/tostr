@@ -1,17 +1,14 @@
 import asyncio
 import os
 import shutil
-import time
-import json
 from pathlib import Path
-from typing import Annotated
 from watchfiles import awatch, Change
 from loguru import logger
 
 from tostr.llm import LLMClient, GeminiStrategy
 from tostr.core import Registry, tost, Verbosity, BaseParser, SQLiteCache, BaseCodeStruct
 
-from tostr.exceptions import APIKeyError, StructNotFoundError, ResolveError, DatabaseNotFoundError, TargetFileNotFoundError
+from tostr.exceptions import APIKeyError, StructNotFoundError, DatabaseNotFoundError
 
 def _verify_db_exists(target_path: Path):
     if not os.path.exists(target_path):
