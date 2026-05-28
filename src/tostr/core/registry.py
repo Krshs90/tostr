@@ -59,7 +59,7 @@ class Registry:
         
     def resolve_methods(self, name: str, arity: int, parent_name: Optional[str] = None):
         if parent_name:
-            return [x for x in self.methods if x.name == name and x.arity == arity and x.parent.name == parent_name]
+            return [x for x in self.methods if x.name == name and x.arity == arity and (x.parent.uid == parent_name or x.parent.name == parent_name)]
         return [x for x in self.methods if x.name == name and x.arity == arity]
     
     def load_filepath(self, path: Path):

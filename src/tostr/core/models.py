@@ -394,16 +394,16 @@ class BaseMethod(BaseCodeStruct):
     def resolve_dependencies(self):
         for name, arity in self.dependency_names:
             # LOCAL
-            for child_set in self.children.values():
+            search_scope = self.parent.children if self.parent else self.children
+            for child_set in search_scope.values():
                 for child in child_set:
-                    if isinstance(child, BaseCodeStruct | BaseField) and child.name == name and child.arity == arity:
+                    if child.name == name and getattr(child, 'arity', -1) == arity:
                         self.add_dependency(child)
                         break
             
             # IMPORTED
             for imp in self.parent.imports:
-                import_name = f"{imp}#{name}"
-                candidates = self.registry.resolve_methods(name=name, arity=arity, parent_name=import_name)
+                candidates = self.registry.resolve_methods(name=name, arity=arity, parent_name=imp)
                 if len(candidates) == 1:
                     self.add_dependency(candidates[0])
                 elif len(candidates) > 1:

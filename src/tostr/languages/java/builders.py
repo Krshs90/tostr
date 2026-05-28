@@ -114,7 +114,10 @@ class JavaClassBuilder(BaseClassBuilder):
         
         uid = ""
         if isinstance(parent, BaseFile):
-            uid = f"{parent.uid}#{name}"
+            if parent.package:
+                uid = f"{parent.package}.{name}"
+            else:
+                uid = f"{parent.uid}#{name}"
         else:
             uid = f"{parent.uid}.{name}"
         
@@ -212,7 +215,10 @@ class JavaMethodBuilder(BaseMethodBuilder):
         
         uid = ""
         if isinstance(parent, BaseFile):
-            uid = f"{parent.uid}#{name}{parameters_string}"
+            if parent.package:
+                uid = f"{parent.package}.{name}{parameters_string}"
+            else:
+                uid = f"{parent.uid}#{name}{parameters_string}"
         else:
             uid = f"{parent.uid}.{name}{parameters_string}"
         
@@ -222,10 +228,10 @@ class JavaMethodBuilder(BaseMethodBuilder):
         cursor = QueryCursor(query)
         captures = cursor.captures(node)
         for dep in captures.get("dependencies", []):
-            name = dep.child_by_field_name('name').text.decode('utf-8').strip()
-            parameters = dep.child_by_field_name('arguments')
-            arity = len(parameters.named_children)
-            dependency_names.append((name, arity))
+            dep_name = dep.child_by_field_name('name').text.decode('utf-8').strip()
+            dep_arguments = dep.child_by_field_name('arguments')
+            dep_arity = len(dep_arguments.named_children) if dep_arguments else 0
+            dependency_names.append((dep_name, dep_arity))
         
         return BaseMethod(
             # BaseStruct
@@ -278,7 +284,10 @@ class JavaFieldBuilder(BaseFieldBuilder):
         
         uid = ""
         if isinstance(parent, BaseFile):
-            uid = f"{parent.uid}#{name}"
+            if parent.package:
+                uid = f"{parent.package}.{name}"
+            else:
+                uid = f"{parent.uid}#{name}"
         else:
             uid = f"{parent.uid}.{name}"
 
