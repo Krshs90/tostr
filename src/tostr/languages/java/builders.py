@@ -47,9 +47,13 @@ class JavaFileBuilder(BaseFileBuilder):
                         break
                     
             if child.type == "import_declaration":
+                is_wildcard = any(gc.type == "asterisk" for gc in child.children)
                 for grandchild in child.children:
                     if grandchild.type in {"scoped_identifier", "identifier"}:
-                        imports.append(grandchild.text.decode('utf-8'))
+                        imp_name = grandchild.text.decode('utf-8')
+                        if is_wildcard:
+                            imp_name += ".*"
+                        imports.append(imp_name)
                         
             child_instance = None
             if child.type == "class_declaration" or child.type == "interface_declaration":
@@ -226,12 +230,21 @@ class JavaMethodBuilder(BaseMethodBuilder):
         
         query = Query(JAVA_LANGUAGE, DEPENDENCY_QUERY)
         cursor = QueryCursor(query)
-        captures = cursor.captures(node)
-        for dep in captures.get("dependencies", []):
-            dep_name = dep.child_by_field_name('name').text.decode('utf-8').strip()
-            dep_arguments = dep.child_by_field_name('arguments')
-            dep_arity = len(dep_arguments.named_children) if dep_arguments else 0
-            dependency_names.append((dep_name, dep_arity))
+        matches = cursor.matches(node)
+        for _, captures in matches:
+            if "method_call" in captures:
+                name_node = captures.get("name")[0]
+                dep_name = name_node.text.decode('utf-8').strip()
+                args_node = captures.get("args")[0]
+                dep_arity = len(args_node.named_children)
+                receiver = captures.get("receiver")[0].text.decode('utf-8').strip() if "receiver" in captures else None
+                dependency_names.append((dep_name, dep_arity, receiver, False))
+            elif "object_creation" in captures:
+                type_node = captures.get("type")[0]
+                dep_name = type_node.text.decode('utf-8').strip()
+                args_node = captures.get("args")[0]
+                dep_arity = len(args_node.named_children)
+                dependency_names.append((dep_name, dep_arity, None, True))
         
         return BaseMethod(
             # BaseStruct

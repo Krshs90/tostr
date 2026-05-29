@@ -45,7 +45,7 @@ class BaseFileBuilder(BaseStructBuilder):
         file_obj = BaseFile(
             name=rel_path.name,
             uid=str(rel_path),
-            path=self.registry.relative_to_project(rel_path),
+            path=rel_path,
             registry=self.registry
         )
         return file_obj
