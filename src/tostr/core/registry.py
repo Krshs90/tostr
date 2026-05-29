@@ -18,6 +18,8 @@ class Registry:
         self.use_cache = use_cache
         self.uid_map: Dict[str, BaseStruct] = {}
         self.id_map: Dict[str, BaseStruct] = {}
+        self.missing_uids: Set[str] = set()
+        self.missing_packages: Set[str] = set()
         self.root: Optional[BaseStruct] = None
         self.db = db
         self.config = ProjectConfig(project_path) if project_path else None
@@ -40,8 +42,12 @@ class Registry:
     
     def relative_to_project(self, path: Path) -> Path:
         if not self.project_path:
-            logger.warning("Project path not set in registry, returning original path")
+            # logger.warning("Project path not set in registry, returning original path")
             return path
+        
+        if not path.is_absolute():
+            return path
+
         try:
             return path.resolve().relative_to(self.project_path.resolve())
         except ValueError:
@@ -59,8 +65,62 @@ class Registry:
         
     def resolve_methods(self, name: str, arity: int, parent_name: Optional[str] = None):
         if parent_name:
-            return [x for x in self.methods if x.name == name and x.arity == arity and x.parent.name == parent_name]
+            if parent_name.endswith(".*"):
+                package_name = parent_name[:-2]
+                classes = self.get_classes_in_package(package_name)
+                candidates = []
+                for cls in classes:
+                    candidates.extend(self._resolve_methods_recursive(cls, name, arity, set()))
+                return candidates
+            
+            parent = self.get_struct_by_uid(parent_name)
+            if parent:
+                return self._resolve_methods_recursive(parent, name, arity, set())
+            return []
+            
         return [x for x in self.methods if x.name == name and x.arity == arity]
+
+    def _resolve_methods_recursive(self, struct: "BaseStruct", name: str, arity: int, visited: set) -> List[BaseMethod]:
+        if struct.uid in visited: return []
+        visited.add(struct.uid)
+
+        # 1. Local methods
+        matches = [x for x in struct.methods if x.name == name and x.arity == arity]
+        if matches: return matches
+
+        # 2. Inherited methods
+        if hasattr(struct, 'inherits') and struct.inherits:
+            for parent_name in struct.inherits:
+                # Use the class's own resolution logic to find the parent struct
+                if hasattr(struct, 'resolve_type'):
+                    parent = struct.resolve_type(parent_name)
+                    if parent:
+                        inherited_matches = self._resolve_methods_recursive(parent, name, arity, visited)
+                        if inherited_matches: return inherited_matches
+        
+        return []
+
+    def get_classes_in_package(self, package_name: str) -> List[BaseClass]:
+        """ Retrieves all classes in a specific package from memory or DB """
+        if package_name in self.missing_packages:
+            return [x for x in self.classes if x.uid.startswith(package_name + ".") or x.uid.startswith(package_name + "#")]
+
+        # Ensure we have all classes from this package in memory
+        if self.use_cache and self.db:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                # Find all classes in this package
+                cursor.execute(
+                    "SELECT uid FROM structs WHERE type = 'BaseClass' AND (uid LIKE ? OR uid LIKE ?)",
+                    (f"{package_name}.%", f"{package_name}#%")
+                )
+                rows = cursor.fetchall()
+                if not rows:
+                    self.missing_packages.add(package_name)
+                for row in rows:
+                    self.get_struct_by_uid(row[0])
+        
+        return [x for x in self.classes if x.uid.startswith(package_name + ".") or x.uid.startswith(package_name + "#")]
     
     def load_filepath(self, path: Path):
         logger.debug(f"Loading subtree {str(path)}")
@@ -71,7 +131,7 @@ class Registry:
             
             # pull and hydrate structs
             if path_str != ".":
-                cursor.execute("SELECT * FROM structs WHERE path LIKE ? || '%'", (resolved_path_str,))
+                cursor.execute("SELECT * FROM structs WHERE path = ? OR path LIKE ? || '/%'", (path_str, path_str))
             else:
                 cursor.execute("SELECT * FROM structs")
                 
@@ -83,6 +143,12 @@ class Registry:
                 
                 if struct_data.get('imports', None):
                     struct_data['imports'] = json.loads(struct_data['imports'])
+                if struct_data.get('dependency_names', None):
+                    struct_data['dependency_names'] = json.loads(struct_data['dependency_names'])
+                if struct_data.get('inherits', None):
+                    struct_data['inherits'] = json.loads(struct_data['inherits'])
+                if struct_data.get('enum_constants', None):
+                    struct_data['enum_constants'] = json.loads(struct_data['enum_constants'])
                 
                 builder = BaseBuilder(self)
                 struct_type = struct_data['type']
@@ -139,17 +205,18 @@ class Registry:
         return self.root
     
     def get_struct_by_uid(self, uid: str) -> Optional["BaseStruct"]:
-        logger.debug(f"Attempting to retrieve struct and its children with UID {uid} from registry")
-        
         # Check memory cache first
         if uid in self.uid_map:
-            logger.debug(f"Cache hit for UID {uid}, returning memory object")
+            # logger.debug(f"Cache hit for UID {uid}, returning memory object")
             return self.uid_map[uid]
+        
+        if uid in self.missing_uids:
+            return None
 
         if not self.use_cache or not self.db:
-            logger.debug(f"Cache miss for UID {uid}, but no DB provided or caching disabled, returning None")
             return None
         
+        logger.debug(f"Attempting to retrieve struct and its children with UID {uid} from DB")
         from tostr.core.builders import BaseBuilder
         import json
         
@@ -169,6 +236,7 @@ class Registry:
             
             if not node_rows:
                 logger.debug(f"No structs found in DB matching UID {uid}")
+                self.missing_uids.add(uid)
                 return None
                 
             node_ids = [str(row['id']) for row in node_rows]
@@ -185,6 +253,12 @@ class Registry:
                 if current_id not in self.id_map:
                     if struct_data.get('imports', None):
                         struct_data['imports'] = json.loads(struct_data['imports'])
+                    if struct_data.get('dependency_names', None):
+                        struct_data['dependency_names'] = json.loads(struct_data['dependency_names'])
+                    if struct_data.get('inherits', None):
+                        struct_data['inherits'] = json.loads(struct_data['inherits'])
+                    if struct_data.get('enum_constants', None):
+                        struct_data['enum_constants'] = json.loads(struct_data['enum_constants'])
                     
                     builder = BaseBuilder(self)
                     struct_type = struct_data['type']

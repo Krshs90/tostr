@@ -103,11 +103,9 @@ async def skeleton_async(subpath: str, project_path: Path, pretty: bool = True):
     registry = Registry(db=db, project_path=project_path)
     
     subpath = Path(project_path / subpath)
-    relative_subpath = subpath.resolve().relative_to(registry.project_path.resolve())
-    # relative_subpath = registry.relative_to_project(subpath)
-    logger.debug(f"Loading subtree for relative path: {relative_subpath}")
+    logger.debug(f"Loading subtree for path: {subpath}")
     
-    registry.load_filepath(relative_subpath)
+    registry.load_filepath(subpath)
     if not registry.files:
         raise FileNotFoundError(f"No files found matching path '{subpath}'.")
     

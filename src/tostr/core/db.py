@@ -51,7 +51,8 @@ class SQLiteCache:
                     inherits JSON,
                     enum_constants JSON,
                     field_type TEXT,
-                    arity INTEGER
+                    arity INTEGER,
+                    dependency_names JSON
                 )
             """)
 

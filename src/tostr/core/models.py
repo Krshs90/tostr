@@ -48,19 +48,28 @@ class BaseStruct(ABC):
     path: Path = None
     
     _IDPREFIX: ClassVar[str] = "S"
+
+    # Caches
+    _all_children_cache: Optional[List["BaseStruct"]] = field(default=None, init=False, repr=False)
+    _methods_cache: Optional[List["BaseMethod"]] = field(default=None, init=False, repr=False)
+    _fields_cache: Optional[List["BaseField"]] = field(default=None, init=False, repr=False)
+    _classes_cache: Optional[List["BaseClass"]] = field(default=None, init=False, repr=False)
+    _directories_cache: Optional[List["Directory"]] = field(default=None, init=False, repr=False)
     
-    _all_children: List["BaseStruct"] = field(init=False, repr=False, default_factory=list)
     @property
     def all_children(self):
-        if self._all_children: return self._all_children
-        self._all_children = []
+        if self._all_children_cache is not None: return self._all_children_cache
+        all_children = []
         for child_set in self.children.values():
-            self._all_children.extend(child_set)
-        return self._all_children
+            all_children.extend(child_set)
+        self._all_children_cache = all_children
+        return all_children
     
     @property
     def directories(self):
-        return [child for child in self.all_children if isinstance(child, Directory)]
+        if self._directories_cache is not None: return self._directories_cache
+        self._directories_cache = [child for child in self.all_children if isinstance(child, Directory)]
+        return self._directories_cache
     
     @property
     def files(self):
@@ -68,15 +77,21 @@ class BaseStruct(ABC):
     
     @property
     def methods(self):
-        return [child for child in self.all_children if isinstance(child, BaseMethod)]
+        if self._methods_cache is not None: return self._methods_cache
+        self._methods_cache = [child for child in self.all_children if isinstance(child, BaseMethod)]
+        return self._methods_cache
     
     @property
     def fields(self):
-        return [child for child in self.all_children if isinstance(child, BaseField)]
+        if self._fields_cache is not None: return self._fields_cache
+        self._fields_cache = [child for child in self.all_children if isinstance(child, BaseField)]
+        return self._fields_cache
     
     @property
     def classes(self):
-        return [child for child in self.all_children if isinstance(child, BaseClass)]
+        if self._classes_cache is not None: return self._classes_cache
+        self._classes_cache = [child for child in self.all_children if isinstance(child, BaseClass)]
+        return self._classes_cache
     
     @property
     def edges(self):
@@ -114,6 +129,14 @@ class BaseStruct(ABC):
             
         self.children[type_name].add(child)
         child.set_parent(self)
+        self._clear_caches()
+
+    def _clear_caches(self):
+        self._all_children_cache = None
+        self._methods_cache = None
+        self._fields_cache = None
+        self._classes_cache = None
+        self._directories_cache = None
     
     def set_parent(self, parent: "BaseStruct"):
         if self is parent:
@@ -141,8 +164,8 @@ class BaseStruct(ABC):
         
     def resolve_dependencies(self):
         # logger.debug(f"Resolving dependencies for {self}")
-        for child_set in self.children.values():
-            for child in child_set:
+        for child_set in list(self.children.values()):
+            for child in list(child_set):
                 child.resolve_dependencies()
     
     @abstractmethod
@@ -165,7 +188,7 @@ class BaseStruct(ABC):
             "name": self.name,
             "uid": self.uid,
             "type": "BaseStruct",
-            "path": str(self.path.resolve()),
+            "path": str(self.path) if self.path else ".",
             "description": self.description,
             "inbound_dependency_strings": self.inbound_dependency_strings,
             "outbound_dependency_strings": self.outbound_dependency_strings,
@@ -284,6 +307,14 @@ class BaseClass(BaseCodeStruct):
     enum_constants: Optional[List[str]] = None
     inherits: List[str] = field(default_factory=list) # list of parent class UIDs for inheritance relationships
     
+    _type_cache: Dict[str, Optional[BaseStruct]] = field(default_factory=dict, init=False, repr=False)
+    _potential_parents_cache: Optional[List[str]] = field(default=None, init=False, repr=False)
+
+    def _clear_caches(self):
+        super()._clear_caches()
+        self._type_cache = {}
+        self._potential_parents_cache = None
+
     @property
     def needs_description(self) -> bool:
         if not self.description:
@@ -298,6 +329,39 @@ class BaseClass(BaseCodeStruct):
     def imports(self) -> List[str]:
         return self.parent.imports
     
+    def resolve_type(self, type_name: str) -> Optional[BaseStruct]:
+        """Resolves a simple or scoped type name to a struct using package and imports."""
+        if not type_name: return None
+        if type_name in self._type_cache:
+            return self._type_cache[type_name]
+
+        # 1. Exact match (already a UID)
+        dep = self.registry.get_struct_by_uid(type_name)
+        
+        # 2. Same package
+        if not dep:
+            package = getattr(self.parent, 'package', None) if isinstance(self.parent, BaseFile) else None
+            if package:
+                dep = self.registry.get_struct_by_uid(f"{package}.{type_name}")
+        
+        # 3. Specific imports
+        if not dep:
+            for imp in self.imports:
+                if imp.endswith(f".{type_name}"):
+                    dep = self.registry.get_struct_by_uid(imp)
+                    if dep: break
+        
+        # 4. Wildcard imports
+        if not dep:
+            for imp in self.imports:
+                if imp.endswith(".*"):
+                    package_name = imp[:-2]
+                    dep = self.registry.get_struct_by_uid(f"{package_name}.{type_name}")
+                    if dep: break
+        
+        self._type_cache[type_name] = dep
+        return dep
+
     def resolve_dependencies(self):
         # logger.debug(f"Resolving dependencies for {self}")
         # resolve child dependencies
@@ -305,18 +369,23 @@ class BaseClass(BaseCodeStruct):
         
         # resolve import dependencies
         for imp in self.imports:
-            import_name = imp.split('.')[-1]
-            import_dependency = self.registry.get_struct_by_uid(imp)
-            if import_dependency:
-                self.add_dependency(import_dependency)
+            if not imp.endswith(".*"):
+                import_dependency = self.registry.get_struct_by_uid(imp)
+                if import_dependency:
+                    self.add_dependency(import_dependency)
         
         # resolve inheritance dependencies
         if self.inherits:
             for parent_class in self.inherits:
-                parent_class_name = parent_class.split('.')[-1]
-                parent_dependency = self.registry.get_struct_by_uid(parent_class_name)
-                if parent_dependency:
-                    self.add_dependency(parent_dependency)
+                dep = self.resolve_type(parent_class)
+                if dep:
+                    self.add_dependency(dep)
+        
+        # resolve field types
+        for field in self.fields:
+            dep = self.resolve_type(field.field_type)
+            if dep:
+                self.add_dependency(dep)
         
         # logger.debug(f"Resolved dependencies for {self.name}: {self.outbound_dependency_strings}")
 
@@ -383,7 +452,8 @@ class BaseMethod(BaseCodeStruct):
     _IDPREFIX: ClassVar[str] = "M"
     
     arity: int = 0
-    dependency_names: Optional[List[tuple[str, int]]] = field(default_factory=list)
+    # List of (name, arity, receiver, is_creation)
+    dependency_names: Optional[List[tuple]] = field(default_factory=list)
     
     children: dict = field(init=False, repr=False, default_factory=dict)
     
@@ -392,34 +462,88 @@ class BaseMethod(BaseCodeStruct):
     #     pass
     
     def resolve_dependencies(self):
-        for name, arity in self.dependency_names:
-            # LOCAL
-            for child_set in self.children.values():
-                for child in child_set:
-                    if isinstance(child, BaseCodeStruct | BaseField) and child.name == name and child.arity == arity:
+        logger.info(f"Resolving dependencies for method {self.uid}")
+        for dep_info in self.dependency_names:
+            # Handle both old (name, arity) and new (name, arity, receiver, is_creation) formats
+            if len(dep_info) == 2:
+                name, arity = dep_info
+                receiver, is_creation = None, False
+            else:
+                name, arity, receiver, is_creation = dep_info
+
+            if is_creation:
+                if isinstance(self.parent, BaseClass):
+                    dep = self.parent.resolve_type(name)
+                    if dep: self.add_dependency(dep)
+                continue
+
+            # --- METHOD RESOLUTION ---
+            resolved = False
+            # 1. LOCAL
+            search_scope = self.parent.children if self.parent else self.children
+            for child_set in list(search_scope.values()):
+                for child in list(child_set):
+                    if child.name == name and getattr(child, 'arity', -1) == arity:
                         self.add_dependency(child)
+                        resolved = True
                         break
+                if resolved: break
+            if resolved: continue
+
+            # 2. RECEIVER-BASED HEURISTIC
+            if receiver and isinstance(self.parent, BaseClass):
+                # Check fields for receiver type
+                receiver_type = None
+                for field in self.parent.fields:
+                    if field.name == receiver:
+                        receiver_type = field.field_type
+                        break
+                
+                if receiver_type:
+                    dep_type = self.parent.resolve_type(receiver_type)
+                    if dep_type:
+                        candidates = self.registry.resolve_methods(name=name, arity=arity, parent_name=dep_type.uid)
+                        if candidates:
+                            self.add_dependency(candidates[0])
+                            continue
             
-            # IMPORTED
-            for imp in self.parent.imports:
-                import_name = f"{imp}#{name}"
-                candidates = self.registry.resolve_methods(name=name, arity=arity, parent_name=import_name)
-                if len(candidates) == 1:
-                    self.add_dependency(candidates[0])
-                elif len(candidates) > 1:
-                    for c in candidates:
-                        self.add_fuzzy_dependency(c)
-            
-            # INHERITED
-            for parent_class in self.parent.inherits:
-                parent_name = parent_class.split('.')[-1]
-                # TODO: implement resolve_methods_by_name in registry
-                candidates = self.registry.resolve_methods(name=name, arity=arity, parent_name=parent_name)
-                if len(candidates) == 1:
-                    self.add_dependency(candidates[0])
-                elif len(candidates) > 1:
-                    for c in candidates:
-                        self.add_fuzzy_dependency(c)
+            # 3. IMPORTED & INHERITED (including wildcards)
+            if isinstance(self.parent, BaseClass):
+                if self.parent._potential_parents_cache is None:
+                    potential_parents = []
+                    # Same package
+                    package = getattr(self.parent.parent, 'package', None) if isinstance(self.parent.parent, BaseFile) else None
+                    if package: potential_parents.append(f"{package}.*")
+                    
+                    # All imports
+                    potential_parents.extend(self.parent.imports)
+                    
+                    # All inheritance
+                    potential_parents.extend(self.parent.inherits)
+                    self.parent._potential_parents_cache = potential_parents
+                
+                potential_parents = self.parent._potential_parents_cache
+                all_candidates = []
+                for p_name in potential_parents:
+                    candidates = self.registry.resolve_methods(name=name, arity=arity, parent_name=p_name)
+                    all_candidates.extend(candidates)
+                
+                if len(all_candidates) == 1:
+                    # logger.debug(f"Resolved {name} to {all_candidates[0].uid}")
+                    self.add_dependency(all_candidates[0])
+                elif len(all_candidates) > 1:
+                    # Apply heuristic: if receiver matches part of class name
+                    refined_candidates = []
+                    if receiver:
+                        for c in all_candidates:
+                            if receiver.lower() in c.parent.name.lower():
+                                refined_candidates.append(c)
+                    
+                    if len(refined_candidates) == 1:
+                        self.add_dependency(refined_candidates[0])
+                    else:
+                        for c in all_candidates:
+                            self.add_fuzzy_dependency(c)
             
     async def resolve_description_async(self, llm: "LLMClient", visited: set[str] = None):
         pass
@@ -428,6 +552,7 @@ class BaseMethod(BaseCodeStruct):
         data = super().to_dict()
         data["type"] = "BaseMethod"
         data["arity"] = self.arity
+        data["dependency_names"] = self.dependency_names
         return data
 
 @dataclass(eq=False)

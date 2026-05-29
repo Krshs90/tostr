@@ -33,33 +33,48 @@ class BaseParser(ABC):
         
         await self.resolve_descriptions_async()
         
-    def parse_path(self, subpath: Path = None):
+    def parse_path(self, subpath: Path, parent: Directory = None):
         if subpath.is_dir():
-            logger.debug(f"🔍 Parsing files in '{subpath}'")
+            logger.debug(f"🔍 Parsing directory '{subpath}'")
             
-            # Use relative path for root UID if possible
-            root_path = subpath
-            if self.registry:
-                root_path = self.registry.relative_to_project(subpath)
-                
-            root = Directory(path=root_path, registry=self.registry)
-            self.registry.root = root
-            logger.debug(f"Created registry root: {root}")
-            self.registry.add_struct(root)
+            if parent is None:
+                # ROOT creation
+                root_path = subpath
+                if self.registry:
+                    root_path = self.registry.relative_to_project(subpath)
+                root = Directory(path=root_path, registry=self.registry)
+                self.registry.root = root
+                logger.debug(f"Created registry root: {root}")
+                self.registry.add_struct(root)
+            else:
+                root = parent
+
             for path in subpath.glob("*"):
                 if self.registry.config.is_ignored(path):
                     logger.debug(f"Skipping '{path}' due to path ignore rules")
                     continue
+                
+                relative_path = self.registry.relative_to_project(path)
+                existing = self.registry.get_struct_by_uid(str(relative_path))
+                
                 if path.is_dir():
-                    logger.debug(f"🔍 Parsing directory '{path}'")
-                    relative_path = path.resolve().relative_to(self.registry.project_path.resolve())
-                    # relative_path = self.registry.relative_to_project(path)
+                    if existing and isinstance(existing, Directory):
+                        logger.debug(f"Using cached directory '{path}'")
+                        root.add_child(existing)
+                        self.parse_path(path, parent=existing)
+                        continue
+
                     directory = Directory(path=relative_path, registry=self.registry, parent=root)
                     self.registry.add_struct(directory)
                     root.add_child(directory)
-                    directory.parse_children()
+                    self.parse_path(path, parent=directory)
                 else:
-                    logger.debug(f"🔍 Parsing file '{path}'")
+                    if existing and isinstance(existing, BaseFile):
+                        if not self.registry.is_stale(existing):
+                            logger.debug(f"Using cached file '{path}'")
+                            root.add_child(existing)
+                            continue
+
                     file = self.parse_file(path, parent=root)
                     if file:
                         self.registry.add_struct(file)
@@ -87,6 +102,7 @@ class BaseParser(ABC):
         return file_obj
     
     def resolve_dependencies(self):
+        logger.info(f"Starting dependency resolution from root: {self.registry.root}")
         self.registry.root.resolve_dependencies()
     
     def load_cache(self):
