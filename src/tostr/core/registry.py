@@ -194,15 +194,15 @@ class Registry:
         if not self.use_cache or not self.db:
             return None
         
-        logger.debug(f"Attempting to retrieve struct and its children with UID {uid} from DB")
+        logger.debug(f"Attempting to retrieve {uid} and its children from DB")
         from tostr.core.builders import BaseBuilder
         
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
             if uid != ".":
                 cursor.execute(
-                    "SELECT * FROM structs WHERE uid = ? OR uid LIKE ? OR uid LIKE ?", 
-                    (uid, f"{uid}%", f"{uid}#%")
+                    "SELECT * FROM structs WHERE uid = ? OR uid LIKE ? OR uid LIKE ? OR path = ?", 
+                    (uid, f"{uid}%", f"{uid}#%", uid)
                 )
             else:
                 cursor.execute("SELECT * FROM structs")
