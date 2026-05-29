@@ -141,8 +141,8 @@ class BaseStruct(ABC):
         
     def resolve_dependencies(self):
         # logger.debug(f"Resolving dependencies for {self}")
-        for child_set in self.children.values():
-            for child in child_set:
+        for child_set in list(self.children.values()):
+            for child in list(child_set):
                 child.resolve_dependencies()
     
     @abstractmethod
