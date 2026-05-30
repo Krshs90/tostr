@@ -46,6 +46,7 @@ class BaseStruct(ABC):
     parent: BaseStruct | str = None
     children: Dict[str, Set[BaseStruct | str]] = field(default_factory=dict)
     path: Path = None
+    diff_hash: str = ""
     
     _IDPREFIX: ClassVar[str] = "S"
 
@@ -143,6 +144,15 @@ class BaseStruct(ABC):
             logger.warning(f"Attempted to set parent of {self} to itself. Skipping to avoid circular reference.")
             return
         self.parent = parent
+
+    def calculate_distributed_hash(self):
+        """Calculates diff_hash based on direct children's hashes."""
+        if not self.all_children:
+            return
+
+        child_hashes = sorted([child.diff_hash for child in self.all_children if getattr(child, "diff_hash", None)])
+        if child_hashes:
+            self.diff_hash = hashlib.md5("".join(child_hashes).encode("utf-8")).hexdigest()
     
     def add_dependency(self, target: "BaseStruct"):
         self.outbound_dependencies.add(target)
@@ -190,6 +200,7 @@ class BaseStruct(ABC):
             "type": "BaseStruct",
             "path": str(self.path) if self.path else ".",
             "description": self.description,
+            "diff_hash": self.diff_hash,
             "inbound_dependency_strings": self.inbound_dependency_strings,
             "outbound_dependency_strings": self.outbound_dependency_strings,
         }
@@ -253,8 +264,15 @@ class Directory(BaseStruct):
                     except LanguageNotSupportedError as e:
                         continue
                     instance = builder.build_file().from_path(path, parent=self)
+                    
+                    # Calculate file hash from children if any exist
+                    instance.calculate_distributed_hash()
+
                     self.registry.add_struct(instance)
                     self.add_child(instance)
+        
+        # Calculate directory hash from its direct children
+        self.calculate_distributed_hash()
     
     def to_dict(self) -> dict:
         data = super().to_dict()
@@ -286,7 +304,6 @@ class BaseCodeStruct(BaseStruct):
     
     signature: str = ""         # public static int add(int num1, int num2) or class <T> Example extends BaseClass
     body: str = ""              # signature + method body or class body for hashing and LLM context
-    diff_hash: str = ""         # hash of the code body - whitespace for change detection
     start_line: int = 0         
     end_line: int = 0
     node: "Node" = None         # Optional reference to the tree-sitter node for advanced processing (e.g., skeletonization)
@@ -296,7 +313,6 @@ class BaseCodeStruct(BaseStruct):
         data["type"] = "BaseCodeStruct"
         data["signature"] = self.signature
         data["body"] = self.body
-        data["diff_hash"] = self.diff_hash
         data["start_line"] = self.start_line
         data["end_line"] = self.end_line
         return data

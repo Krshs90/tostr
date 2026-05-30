@@ -159,13 +159,15 @@ async def process_single_file(project_dir: Path, filepath: Path, llm_client: LLM
         
         await asyncio.to_thread(registry.save_to_cache, stale=True)
         logger.debug("Wrote Cache w/ stale descriptions")
+
+        await asyncio.to_thread(registry.propagate_hash_update, str(filepath))
         
         # resolve the descriptions and do the second cache write
         await parser.resolve_descriptions_async()
         await asyncio.to_thread(registry.save_to_cache)
         logger.debug("Wrote Cache w/ resolved descriptions")
         
-        logger.success(f"✅ Processed file {filepath}")
+        logger.debug(f"✅ Processed file {filepath}")
         
     except asyncio.CancelledError:
         logger.warning(f"Task cancelled on {filepath}")
