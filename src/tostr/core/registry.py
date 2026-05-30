@@ -1,7 +1,11 @@
 from collections import defaultdict
 from typing import List, Dict, Optional, TYPE_CHECKING
 from pathlib import Path
-from tostr.core.models import BaseFile, BaseClass, BaseMethod, BaseField
+import json
+import hashlib
+from loguru import logger
+
+from tostr.core.models import BaseFile, BaseClass, BaseMethod, BaseField, Directory
 from tostr.core.db import SQLiteCache
 from tostr.core.builders import BaseBuilder
 from tostr.core.context.config import ProjectConfig
@@ -43,7 +47,6 @@ class Registry:
     
     def relative_to_project(self, path: Path) -> Path:
         if not self.project_path:
-            # logger.warning("Project path not set in registry, returning original path")
             return path
         
         if not path.is_absolute():
@@ -56,10 +59,9 @@ class Registry:
             try:
                 return path.absolute().relative_to(self.project_path.absolute())
             except ValueError:
-                # If path is truly outside the subpath or due to macOS symlink quirks, fallback to relpath
                 return Path(os.path.relpath(path.resolve(), self.project_path.resolve()))
     
-    def add_struct(self, struct: BaseStruct):
+    def add_struct(self, struct: "BaseStruct"):
         """ Adds a struct to the in-memory cache """
         self.uid_map[struct.uid] = struct
         self.id_map[struct.id] = struct
