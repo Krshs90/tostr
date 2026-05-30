@@ -227,6 +227,22 @@ def skeleton(
             "-d/-nd",
             help="Enable debug logging"
             )
+    ] = False,
+    depth: Annotated[
+        int,
+        typer.Option(
+            "--depth",
+            "-d",
+            help="Depth to traverse for skeleton generation (default: 7)"
+        )
+    ] = 7, 
+    files_only: Annotated[
+        bool,
+        typer.Option(
+            "--files-only",
+            "-f",
+            help="Only generate skeleton for files (default: False)"
+        )
     ] = False
     
 ):
@@ -235,7 +251,7 @@ def skeleton(
     
     start_time = time.perf_counter()
     try:
-        result = asyncio.run(skeleton_async(subpath, path, pretty=pretty))
+        result = asyncio.run(skeleton_async(subpath, path, pretty=pretty, depth=depth, files_only=files_only))
         print(result)
     except TostrError as e:
         typer.secho(f"❌ Error: {e}", fg="red", err=True)

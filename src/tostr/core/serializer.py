@@ -23,7 +23,6 @@ class tost:
         obj: "BaseStruct",
         files_only: bool = True,
         depth: int = 7,
-        # indent: int = 0,
         pretty: bool = True
     ) -> str:
         indent_str = _INDENT_TAB if pretty else ""

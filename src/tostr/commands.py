@@ -96,7 +96,7 @@ async def inspect_async(struct_id:str, project_path: Path, include_body: bool = 
         tost_string = f"{str(struct_obj.path)}\n{tost_string}"
     return tost_string
 
-async def skeleton_async(subpath: str, project_path: Path, pretty: bool = True):
+async def skeleton_async(subpath: str, project_path: Path, pretty: bool = True, depth: int = 7, files_only: bool = False):
     _verify_db_exists(project_path)
     
     db = SQLiteCache(project_path / ".tostr" / "cache.db")
@@ -109,7 +109,7 @@ async def skeleton_async(subpath: str, project_path: Path, pretty: bool = True):
     if not registry.files:
         raise FileNotFoundError(f"No files found matching path '{subpath}'.")
     
-    return tost.dump_skeleton(registry.root, pretty=pretty)
+    return tost.dump_skeleton(registry.root, pretty=pretty, depth=depth, files_only=files_only)
 
 active_tasks = {}
 

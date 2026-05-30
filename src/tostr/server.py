@@ -162,19 +162,21 @@ async def clean(workspace_path: str) -> str:
         return f"Error: {e}"
 
 @mcp.tool()
-async def skeleton(subpath: str) -> str:
+async def skeleton(subpath: str, files_only: bool = False, depth: int = 7) -> str:
     """
     Output the .tost skeleton format for all files matching a specific subpath.
     Use this to understand the high-level architecture, classes, and function signatures of a file or directory without reading the full code.
     
     Args:
         subpath: File or directory path relative to the project root to generate a skeleton for.
+        files_only: If True, only include files and directories, excluding any code structs. Default is False, which includes all structs.
+        depth: The AST depth of the skeleton to display. Default is 7, which includes most details but can be adjusted for deeper trees.
     """
     if not session.is_initialized:
         return "Error: Tostr is not initialized. You must call 'init' or 'sync' with the absolute workspace path before querying the database."
     
     try:
-        result = await skeleton_async(subpath, session.project_dir, pretty=False)
+        result = await skeleton_async(subpath, session.project_dir, pretty=False, files_only=files_only, depth=depth)
         return str(result)
     except TostrError as e:
         return f"Error: {e}"
