@@ -2,7 +2,7 @@ import asyncio
 import json
 import time
 from abc import ABC, abstractmethod
-from typing import Any, Type
+from typing import Any, Type, Dict
 from pydantic import BaseModel, Field
 from loguru import logger
 
@@ -29,7 +29,7 @@ class LLMStrategy(ABC):
         return self._semaphore
 
     @abstractmethod
-    async def generate(self, input_data_string: str, system_instruction: str, response_schema: BaseModel):
+    async def generate(self, input_data_string: str, system_instruction: str, response_schema: Type[BaseModel]):
         pass
 
 class LLMClient:

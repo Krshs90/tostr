@@ -3,42 +3,34 @@ from unittest.mock import MagicMock
 from tostr.llm.base import LLMClient, LLMStrategy, LLMResponse
 from tostr.core.models import BaseClass, BaseMethod, BaseFile
 from tostr.core.registry import Registry
+from pydantic import BaseModel, Field
+from typing import Type
 
 class MockStrategy(LLMStrategy):
-    async def describe_class(self, input_data_string: str, system_instruction: str) -> LLMResponse:
-        return LLMResponse(
-            description="Mock class description",
-            description_map={0: "Mock method description"},
-            status="success"
-        )
+    async def generate(self, input_data_string: str, system_instruction: str, response_schema: Type[BaseModel]) -> BaseModel:
+        # We need to return an instance of response_schema
+        data = {}
+        if "description" in response_schema.model_fields:
+            data["description"] = "Mock class description"
+        if "description_map" in response_schema.model_fields:
+            data["description_map"] = {0: "Mock method description"}
+        return response_schema(**data)
 
 @pytest.mark.asyncio
-async def test_llm_client_data_flow():
+async def test_llm_client_generate_description():
     """
-    Test that LLMClient correctly calls the strategy and maps method descriptions
-    back to the method objects using the description_map.
+    Test that LLMClient correctly calls the strategy and returns the parsed response.
     """
     strategy = MockStrategy(api_key="test", model_name="test")
     client = LLMClient(strategy)
     
-    # Create a mock method
-    mock_method = MagicMock(spec=BaseMethod, uid="mock.method", name="method")
-    mock_method.parent = MagicMock(spec=BaseFile, imports=[]) # Mock the parent file
-    mock_method.signature = "void test()"
-    mock_method.description = ""
+    class TestSchema(BaseModel):
+        description: str
+        
+    response = await client.generate_description({"input": "data"}, "instruction", TestSchema)
     
-    # Create a mock class
-    mock_class = MagicMock(spec=BaseClass)
-    mock_class.uid = "class_uid"
-    mock_class.methods = [mock_method]
-    mock_class.skeletonize.return_value = "class code"
-    
-    response = await client.describe_class(mock_class, [])
-    
-    # Verify class description in response
+    assert isinstance(response, TestSchema)
     assert response.description == "Mock class description"
-    # Verify that the client mapped the method description back to the mock_method object
-    assert mock_method.description == "Mock method description"
 
 @pytest.mark.asyncio
 async def test_models_resolve_description_data_flow():
@@ -80,32 +72,34 @@ async def test_llm_client_retry_logic():
             super().__init__(*args, **kwargs)
             self.attempts = 0
             
-        async def describe_class(self, input_data_string: str, system_instruction: str) -> LLMResponse:
+        async def generate(self, input_data_string: str, system_instruction: str, response_schema: Type[BaseModel]) -> BaseModel:
             self.attempts += 1
             if self.attempts == 1:
                 raise Exception("503 Server Busy")
-            return LLMResponse(
-                description="Success after retry",
-                status="success"
-            )
+            
+            data = {}
+            if "description" in response_schema.model_fields:
+                data["description"] = "Success after retry"
+            return response_schema(**data)
 
     strategy = RetryStrategy(api_key="test", model_name="test")
     client = LLMClient(strategy)
     
-    mock_class = MagicMock(
-        spec=BaseClass,
-        uid="mock.class",
-        methods=[],
-        skeletonize=MagicMock(return_value="code")
-    )
-    
+    class TestSchema(BaseModel):
+        description: str
+        
     # We need to mock asyncio.sleep to avoid waiting during tests
     with MagicMock() as mock_sleep:
         import asyncio
         original_sleep = asyncio.sleep
-        asyncio.sleep = MagicMock(return_value=original_sleep(0))
         
-        response = await client.describe_class(mock_class, [])
+        # Mock sleep to return immediately
+        async def mock_s(duration):
+            return
+        
+        asyncio.sleep = mock_s
+        
+        response = await client.generate_description({"code": "code"}, "prompt", TestSchema)
         
         asyncio.sleep = original_sleep
     

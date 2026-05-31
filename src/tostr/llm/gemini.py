@@ -9,7 +9,7 @@ class GeminiStrategy(LLMStrategy):
         self.client = genai.Client(api_key=api_key)
         self.model_name = model_name
 
-    async def generate(self, input_data_string: str, system_instruction: str, response_schema: BaseModel):
+    async def generate(self, input_data_string: str, system_instruction: str, response_schema: Type[BaseModel]):
         # Note: LLMClient handles retries and semaphore
         try:
             response = await self.client.aio.models.generate_content(
