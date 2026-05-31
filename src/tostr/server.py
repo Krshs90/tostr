@@ -166,7 +166,7 @@ async def inspect_by_id(ids: Union[str, List[str]], include_body: bool = False) 
     
     try:
         id_list = _parse_list_input(ids)
-        result = await inspect_async(id_list, session.project_dir, include_body, pretty=False)
+        result = await inspect_async(id_list, session.project_dir, include_body, pretty=True)
         return str(result)
     except TostrError as e:
         return f"Error: {e}"
@@ -186,7 +186,7 @@ async def inspect_by_uid(uids: Union[str, List[str]], include_body: bool = False
     
     try:
         uid_list = _parse_list_input(uids)
-        result = await inspect_async(uid_list, session.project_dir, include_body, pretty=False)
+        result = await inspect_async(uid_list, session.project_dir, include_body, pretty=True)
         return str(result)
     except TostrError as e:
         return f"Error: {e}"
@@ -224,7 +224,7 @@ async def skeleton(subpath: str, files_only: bool = False, depth: int = 7) -> st
         return "Error: Tostr is not initialized. You must call 'init' or 'sync' with the absolute workspace path before querying the database."
     
     try:
-        result = await skeleton_async(subpath, session.project_dir, pretty=False, files_only=files_only, depth=depth)
+        result = await skeleton_async(subpath, session.project_dir, pretty=True, files_only=files_only, depth=depth)
         return str(result)
     except TostrError as e:
         return f"Error: {e}"
