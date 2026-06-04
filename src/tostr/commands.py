@@ -5,7 +5,7 @@ from pathlib import Path
 from watchfiles import awatch, Change
 from loguru import logger
 
-from tostr.llm import LLMClient, GeminiStrategy
+from tostr.semantic.llm import LLMClient, GeminiStrategy
 from tostr.core import Registry, tost, Verbosity, BaseParser, SQLiteCache, BaseCodeStruct
 
 from tostr.exceptions import APIKeyError, StructNotFoundError, DatabaseNotFoundError

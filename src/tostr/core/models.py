@@ -11,7 +11,7 @@ from loguru import logger
 from tostr.core.providers import StructBuilderProvider
 from tostr.exceptions import LanguageNotSupportedError
 
-from tostr.llm import CLASS_SYSTEM_INSTRUCTION, FILE_SYSTEM_INSTRUCTION, DIRECTORY_SYSTEM_INSTRUCTION
+from tostr.semantic.llm import CLASS_SYSTEM_INSTRUCTION, FILE_SYSTEM_INSTRUCTION, DIRECTORY_SYSTEM_INSTRUCTION
 
 if TYPE_CHECKING:
     from tostr.core.registry import Registry

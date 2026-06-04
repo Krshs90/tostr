@@ -1,7 +1,7 @@
 from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
-from tostr.llm.base import LLMStrategy, LLMResponse
+from tostr.semantic.llm.base import LLMStrategy, LLMResponse
 
 class GeminiStrategy(LLMStrategy):
     def __init__(self, api_key: str, model_name: str = "gemini-3.1-flash-lite", max_concurrent_requests: int = 200):
