@@ -22,7 +22,8 @@ dependencies = [
     "watchfiles",
     "loguru",
     "fastmcp",
-    "pathspec"
+    "pathspec",
+    "sentence-transformers"
 ]
 
 [project.scripts]
