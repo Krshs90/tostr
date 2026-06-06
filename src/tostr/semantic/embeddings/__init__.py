@@ -1,2 +1,2 @@
 from .base import EmbeddingStrategy, EmbeddingClient
-from .local import SentenceTransformerEmbeddingStrategy
+from .onnx import OnnxEmbeddingStrategy

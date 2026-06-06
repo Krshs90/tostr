@@ -23,7 +23,6 @@ class EmbeddingStrategy(ABC):
 class EmbeddingClient:
     def __init__(self, strategy: EmbeddingStrategy):
         self.strategy = strategy
-        # Unbounded queue is safe here
         self.queue = asyncio.Queue() 
         self._worker_task = None
 
@@ -79,7 +78,7 @@ class EmbeddingClient:
         )
 
         for struct, vector in zip(batch, embeddings):
-            struct.embedding = vector
+            struct.vector = vector
         
         for _ in batch:
             self.queue.task_done()
