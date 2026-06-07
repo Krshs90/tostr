@@ -26,10 +26,10 @@ class BaseStruct(ABC):
     vector: Optional[List[float]] = None # populated asynchronously by the embedding client
     
     # DEPENDENCIES / GRAPH
-    inbound_dependencies: Set[BaseStruct | str] = field(default_factory=set)
-    inbound_dependencies_fuzzy: Set[BaseStruct | str] = field(default_factory=set) # for fuzzy matching during resolution
-    outbound_dependencies: Set[BaseStruct | str] = field(default_factory=set)
-    outbound_dependencies_fuzzy: Set[BaseStruct | str] = field(default_factory=set) # for fuzzy matching during resolution
+    inbound_dependencies: Set["BaseStruct"] = field(default_factory=set)
+    inbound_dependencies_fuzzy: Set["BaseStruct"] = field(default_factory=set) # for fuzzy matching during resolution
+    outbound_dependencies: Set["BaseStruct"] = field(default_factory=set)
+    outbound_dependencies_fuzzy: Set["BaseStruct"] = field(default_factory=set) # for fuzzy matching during resolution
     
     _inbound_dependency_strings: List[str] = field(default_factory=list)
     @property
@@ -48,8 +48,8 @@ class BaseStruct(ABC):
     
     # CONTEXT
     registry: "Registry" = None
-    parent: BaseStruct | str = None
-    children: Dict[str, Set[BaseStruct | str]] = field(default_factory=dict)
+    parent: "BaseStruct" = None
+    children: Dict[str, "BaseStruct"] = field(default_factory=dict)
     path: Path = None
     diff_hash: str = ""
     
