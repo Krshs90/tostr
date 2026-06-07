@@ -14,11 +14,11 @@ class BaseBuilder(ABC):
     
     def with_type(self, struct_type: str) -> "BaseBuilder":
         match(struct_type):
-            case "BaseFile": return self.build_file()
-            case "BaseClass": return self.build_class()
-            case "BaseMethod": return self.build_method()
-            case "BaseField": return self.build_field()
-            case "Directory": return self.build_directory()
+            case "file": return self.build_file()
+            case "class": return self.build_class()
+            case "method": return self.build_method()
+            case "field": return self.build_field()
+            case "directory": return self.build_directory()
         
     def build_file(self) -> "BaseFileBuilder": return BaseFileBuilder(self.registry)
     

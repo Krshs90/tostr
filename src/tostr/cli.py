@@ -12,7 +12,8 @@ from tostr.commands import (
     skeleton_async, 
     watch_async, 
     clean_db,
-    resolve_uid_to_id
+    resolve_uid_to_id,
+    search_async
 )
 
 from tostr.server import mcp
@@ -241,7 +242,7 @@ def inspect(
         result = asyncio.run(inspect_async(ids, path, include_body=include_body, pretty=pretty))
         lines = result.splitlines()
         if len(lines) > max_lines:
-            result = "\n".join(lines[:max_lines]) + "\n...[OUTPUT TRUNCATED AT 500 LINES] - Use a higher '--max-lines <N>' to see more."
+            result = "\n".join(lines[:max_lines]) + f"\n...[OUTPUT TRUNCATED AT {max_lines} LINES (total: {len(lines)})] - Use a higher '--max-lines <N>' to see more."
         print(result)
     except TostrError as e:
         typer.secho(f"❌ Error: {e}", fg="red", err=True)
@@ -251,6 +252,54 @@ def inspect(
     elapsed_time = end_time - start_time
     logger.debug(f"Finished in {elapsed_time:.4f} seconds.")
 
+
+@app.command()
+def search(
+    query: Annotated[
+        str,
+        typer.Argument(help="The search query to embed and find similar structs for")
+    ],
+    path: Path = typer.Argument(
+        ".", 
+        help="Path to the project directory",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        resolve_path=True
+    ),
+    filter: Annotated[
+        str,
+        typer.Option(
+            "--filter",
+            "-f",
+            help="Filter by struct type (e.g., 'class', 'method')"
+        )
+    ] = None,
+    top_k: Annotated[
+        int,
+        typer.Option(
+            "--top-k",
+            "-k",
+            help="Number of results to return"
+        )
+    ] = 5,
+    debug: Annotated[
+        bool, 
+        typer.Option(
+            "--debug/--no-debug", 
+            "-d/-nd",
+            help="Enable debug logging"
+            )
+    ] = False
+):
+    """Search for structs by embedding a search term and finding the top K matches."""
+    configure_cli_logging(debug)
+    try:
+        result = asyncio.run(search_async(query, path, filter_type=filter, top_k=top_k))
+        print(result)
+    except TostrError as e:
+        typer.secho(f"❌ Error: {e}", fg="red", err=True)
+        raise typer.Exit(code=1)
 
 @app.command()
 def skeleton(
@@ -314,7 +363,7 @@ def skeleton(
         result = asyncio.run(skeleton_async(subpath, path, pretty=pretty, depth=depth, files_only=files_only))
         lines = result.splitlines()
         if len(lines) > max_lines:
-            result = "\n".join(lines[:max_lines]) + "\n...[OUTPUT TRUNCATED AT 500 LINES] - Use a higher '--max-lines <N>' to see more."
+            result = "\n".join(lines[:max_lines]) + f"\n...[OUTPUT TRUNCATED AT {max_lines} LINES (total: {len(lines)})] - Use a higher '--max-lines <N>' to see more."
         print(result)
     except TostrError as e:
         typer.secho(f"❌ Error: {e}", fg="red", err=True)
