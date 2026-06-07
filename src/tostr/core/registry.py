@@ -370,7 +370,7 @@ class Registry:
         for node in self.uid_map.values():
             data_dict = node.to_dict()
             if stale and data_dict.get("description"):
-                data_dict["description"] = f"[STALE] {data_dict["description"]}"
+                data_dict["description"] = f"[STALE] {data_dict['description']}"
             
             # Extract vector if present for separate virtual table storage
             vector = data_dict.pop("vector", None)
