@@ -13,7 +13,8 @@ from tostr.commands import (
     watch_async, 
     clean_db,
     resolve_uid_to_id,
-    search_async
+    search_async,
+    get_status
 )
 
 from tostr.server import mcp
