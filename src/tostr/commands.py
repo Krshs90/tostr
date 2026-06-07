@@ -48,7 +48,7 @@ def clean_db(target_path: Path):
 
 async def _build_ast_async(target_path: Path, use_cache: bool = True) -> BaseParser:
     llm = get_llm_client()
-    embedder = get_embedding_client()
+    embedder = get_cached_embedding_client()
     db = SQLiteCache(target_path / ".tostr" / "cache.db")
     registry = Registry(use_cache=use_cache, db=db, project_path=target_path)
     logger.info("Building AST...")

@@ -242,7 +242,7 @@ def inspect(
         result = asyncio.run(inspect_async(ids, path, include_body=include_body, pretty=pretty))
         lines = result.splitlines()
         if len(lines) > max_lines:
-            result = "\n".join(lines[:max_lines]) + "\n...[OUTPUT TRUNCATED AT 500 LINES] - Use a higher '--max-lines <N>' to see more."
+            result = "\n".join(lines[:max_lines]) + f"\n...[OUTPUT TRUNCATED AT {max_lines} LINES (total: {len(lines)})] - Use a higher '--max-lines <N>' to see more."
         print(result)
     except TostrError as e:
         typer.secho(f"❌ Error: {e}", fg="red", err=True)
@@ -363,7 +363,7 @@ def skeleton(
         result = asyncio.run(skeleton_async(subpath, path, pretty=pretty, depth=depth, files_only=files_only))
         lines = result.splitlines()
         if len(lines) > max_lines:
-            result = "\n".join(lines[:max_lines]) + "\n...[OUTPUT TRUNCATED AT 500 LINES] - Use a higher '--max-lines <N>' to see more."
+            result = "\n".join(lines[:max_lines]) + f"\n...[OUTPUT TRUNCATED AT {max_lines} LINES (total: {len(lines)})] - Use a higher '--max-lines <N>' to see more."
         print(result)
     except TostrError as e:
         typer.secho(f"❌ Error: {e}", fg="red", err=True)
