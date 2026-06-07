@@ -29,9 +29,8 @@ jobs:
     - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        # Installs tostr, its pyproject options, plus testing packages
-        python -m pip install -e ".[test]" || python -m pip install -e . pytest
+        python -m pip install -e ".[test]"
 
     - name: Run Test Engine
       run: |
-        pytest
+        python -m pytest

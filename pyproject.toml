@@ -39,3 +39,8 @@ pythonpath = ["src"]
 
 [tool.setuptools.package-data]
 tostr = ["resources/models/all-MiniLM-L6-v2/*"]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+]
