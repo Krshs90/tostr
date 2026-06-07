@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from tostr.semantic.llm.base import LLMStrategy, LLMResponse
+from typing import Type
 
 class GeminiStrategy(LLMStrategy):
     def __init__(self, api_key: str, model_name: str = "gemini-3.1-flash-lite", max_concurrent_requests: int = 200):
