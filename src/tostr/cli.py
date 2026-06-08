@@ -7,6 +7,10 @@ from typing import Annotated, List
 from loguru import logger
 from tostr.exceptions import TostrError
 
+from rich.console import Console
+from rich.theme import Theme
+from rich.highlighter import RegexHighlighter
+
 from tostr.commands import (
     init_async, 
     inspect_async, 
@@ -33,6 +37,33 @@ app = typer.Typer(
     help="AST scraper for LLM RAG context generation.",
     add_completion=False # Optional: Turns off the auto-generated completion install command for cleaner help menus
 )
+
+class TostrHighlighter(RegexHighlighter):
+    """Applies beautiful visual formatting to the custom .tost human layout."""
+    base_style = "tostr."
+    highlights = [
+        # Capture UIDs (e.g., C-5714b4c321, M-d3f989c0fe, F-13cedbe53e)
+        r"(?P<uid>[A-Z]-[0-9a-f]{10})",
+        # Capture multi-line descriptions
+        r"(?P<comment>//.*(?:\n[^\S\n\r]+(?![A-Z]-[0-9a-f]{10}|[<>\~]|fields:|methods:).*)*)",
+        # Capture structural line numbers matching both range styles (@L19-311) and single lines (@L211)
+        r"(?P<line_num>@L\d+(?:-\d+)?)",
+        # Capture dependency symbols (<, >, ~)
+        r"(?P<edge>[<>\~])",
+        # Capture structural sections blocks headers (fields:, methods:)
+        r"(?P<section>fields:|methods:)"
+    ]
+
+# Define an immersive terminal theme layout
+theme = Theme({
+    "tostr.uid": "bold cyan",
+    "tostr.comment": "dim italic white",
+    "tostr.line_num": "green",
+    "tostr.edge": "bold magenta",
+    "tostr.section": "bold yellow",
+})
+
+console = Console(highlighter=TostrHighlighter(), theme=theme)
 
 def _run_watcher_thread(target_path: Path):
     """
@@ -309,7 +340,7 @@ def inspect(
         lines = result.splitlines()
         if len(lines) > max_lines:
             result = "\n".join(lines[:max_lines]) + f"\n...[OUTPUT TRUNCATED AT {max_lines} LINES (total: {len(lines)})] - Use a higher '--max-lines <N>' to see more."
-        print(result)
+        console.print(result)
     except TostrError as e:
         typer.secho(f"❌ Error: {e}", fg="red", err=True)
         raise typer.Exit(code=1)
@@ -362,7 +393,7 @@ def search(
     configure_cli_logging(debug)
     try:
         result = asyncio.run(search_async(query, path, filter_type=filter, top_k=top_k))
-        print(result)
+        console.print(result)
     except TostrError as e:
         typer.secho(f"❌ Error: {e}", fg="red", err=True)
         raise typer.Exit(code=1)
@@ -430,7 +461,8 @@ def skeleton(
         lines = result.splitlines()
         if len(lines) > max_lines:
             result = "\n".join(lines[:max_lines]) + f"\n...[OUTPUT TRUNCATED AT {max_lines} LINES (total: {len(lines)})] - Use a higher '--max-lines <N>' to see more."
-        print(result)
+        # TODO: Add rich.tree for skeleton output readability
+        console.print(result)
     except TostrError as e:
         typer.secho(f"❌ Error: {e}", fg="red", err=True)
         raise typer.Exit(code=1)
