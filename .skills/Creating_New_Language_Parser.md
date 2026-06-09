@@ -56,7 +56,9 @@ Acts as a factory for specific builders (`File`, `Class`, `Method`, `Field`).
 - Responsible for parsing a file and identifying its children (classes, functions, etc.).
 - Must handle imports and package/module names.
 - **Import Normalization:** To keep dependency resolution agnostic, normalize all imports into a standard `namespace.Member` or `namespace.*` format in the `imports` list.
+- **Relative Imports:** Handle relative imports (e.g., `from . import x`) by resolving them against the current file's package path.
 - **Python/Go Consideration:** Files often contain free-floating functions. Ensure these are added as children directly to the `BaseFile` object.
+- **Decorators:** Some grammars (like Python) wrap decorated classes/functions in a `decorated_definition` node. Your builder must handle these by extracting the inner definition node.
 
 ### `BaseClassBuilder`
 - Parses class definitions.
@@ -92,6 +94,8 @@ Tostr uses a Strategy pattern for dependency resolution.
 
 - **`BaseDependencyResolver`**: Handles generic resolution (local lookups, basic normalized import matching, receiver heuristics).
 - **Custom Resolvers**: If your language has unique resolution rules (e.g., specific wildcard behaviors or complex scoping), create a `<Lang>DependencyResolver` in `src/tostr/core/resolver.py` and register it in `Registry.get_resolver()`.
+- **Arity Matching:** By default, Tostr uses strict arity matching (argument count). For dynamic languages like Python (with default/keyword args), set `self.strict_arity = False` in your custom resolver's `__init__`.
+- **Receiver Heuristics:** The resolver attempts to find the type of a receiver (e.g., `obj` in `obj.method()`) by checking local fields. For module-based calls, it should also check the file's normalized imports.
 
 ## 6. Registration
 
@@ -105,3 +109,19 @@ Tostr uses a Strategy pattern for dependency resolution.
 - [ ] `queries.py` covers method calls and object creation.
 - [ ] Extension registered in `providers.py`.
 - [ ] Unit tests created in `tests/languages/<lang>/`.
+
+## 8. Advanced Lessons & Troubleshooting
+
+### Handling Tree-Sitter Node Wrapping
+In many languages, a definition (Class/Function) can be wrapped by decorators. In Python, a decorated class isn't a `class_definition` at the top level of the `module`; it's a `decorated_definition` containing a `class_definition`. Your `FileBuilder` and `ClassBuilder` must account for this nesting to avoid "disjointed" or missing structs.
+
+### The "Arity Trap" in Dynamic Languages
+Java requires exact arity matching because of method overloading. Python does not. If your language supports default arguments, strict arity matching will cause almost all dependency resolutions to fail. Ensure your language's `Registry.resolve_methods` calls pass `arity=None` or use a resolver with `strict_arity=False`.
+
+### Performance: The Bubble-up Storm
+Tostr's graph model bubbles dependencies up from Methods to Classes to Files to Directories. In large projects with wildcard imports (`from x import *`), a failed strict match can trigger thousands of "fuzzy" dependency links. To prevent hangs:
+1. Ensure your `BaseStruct.add_dependency` and `add_fuzzy_dependency` implementations return early if the target is already in the set.
+2. Favor resolving receivers to specific imports before falling back to wide-scope wildcard matching.
+
+### Unified Calls and Instantiations
+If your language uses the same syntax for calling a function and instantiating a class (like Python `MyClass()`), the resolver should attempt to resolve the name as a Type/Class if it fails to find a matching Method.
