@@ -7,7 +7,7 @@ from loguru import logger
 
 from tostr.core.models import BaseFile, Directory, BaseStruct
 from tostr.core.registry import Registry
-from tostr.core.providers import StructBuilderProvider
+from tostr.core.providers import LanguageProvider
 from tostr.exceptions import LanguageNotSupportedError
 
 class BaseParser(ABC):
@@ -80,7 +80,9 @@ class BaseParser(ABC):
             return None
 
         try:
-            builder = StructBuilderProvider.get_builder(subpath.suffix, self.registry)
+            builder = LanguageProvider.get_builder(self.registry)
+            if not builder.handles_extension(subpath.suffix):
+                return None
         except LanguageNotSupportedError as e:
             logger.warning(str(e))
             return None

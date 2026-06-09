@@ -80,7 +80,7 @@ session = MCPSession()
 mcp = FastMCP("Tostr")
 
 @mcp.tool()
-async def init(workspace_path: str, use_cache: bool = True, ignore: str = None) -> str:
+async def init(workspace_path: str, use_cache: bool = True, language: str = "java") -> str:
     """
     -- MUST BE RUN BEFORE ANY OTHER TOOL --
     Initializes the Tostr MCP server for a specific project workspace.
@@ -89,7 +89,7 @@ async def init(workspace_path: str, use_cache: bool = True, ignore: str = None) 
     Args:
         workspace_path: The ABSOLUTE path to the project workspace. DO NOT use '.' or relative paths. If you only have a relative path, you must determine the absolute path of the current workspace first.
         use_cache: Whether to use the existing AST cache. If False, forces a full re-parse.
-        ignore: Add a default ignore template to the project folder (e.g., 'java', 'default').
+        language: The primary language of the project (e.g., 'java', 'python').
     """
     
     target_path = Path(workspace_path)
@@ -120,7 +120,7 @@ async def init(workspace_path: str, use_cache: bool = True, ignore: str = None) 
             return f"Success: Tostr synced with existing database at {target_path}. Background watcher active."
 
         # Otherwise, perform full initialization/parse
-        await init_async(target_path, use_cache, ignore)
+        await init_async(target_path, use_cache, language)
 
         session.project_dir = target_path
         session.start_watcher(target_path)

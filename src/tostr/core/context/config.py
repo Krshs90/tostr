@@ -36,6 +36,10 @@ class ProjectConfig:
         self.toml_config = self._init_toml_config(project_path)
         self.ignore_rules = self._init_path_ignore(project_path)
         self.hardcoded_rules = pathspec.PathSpec.from_lines('gitignore', self.HARDCODED_IGNORES)
+
+    @property
+    def language(self) -> str:
+        return self.toml_config.get("project", {}).get("language", "java")
     
     def _init_toml_config(self, project_path: Path) -> Dict:
         toml_path = project_path / ".tostr" / "config.toml"

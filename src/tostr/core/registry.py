@@ -1,6 +1,6 @@
 from __future__ import annotations
 from collections import defaultdict
-from typing import List, Dict, Optional, TYPE_CHECKING
+from typing import List, Dict, Optional, TYPE_CHECKING, Set
 from pathlib import Path
 import json
 import hashlib
@@ -12,13 +12,11 @@ from tostr.core.models import BaseFile, BaseClass, BaseMethod, BaseField, Direct
 from tostr.core.db import SQLiteCache
 from tostr.core.builders import BaseBuilder
 from tostr.core.context.config import ProjectConfig
-
-import json
-import hashlib
-from loguru import logger
+from tostr.core.resolver import BaseDependencyResolver
 
 if TYPE_CHECKING:
     from tostr.core.models import BaseStruct, BaseCodeStruct
+    from tostr.core.utils.progress import ProgressTracker
 
 class Registry:
     def __init__(self, use_cache: bool = True, db: SQLiteCache = None, project_path: Path = None, progress_tracker: "ProgressTracker" = None):
@@ -32,7 +30,18 @@ class Registry:
         self.root: Optional[BaseStruct] = None
         self.db = db
         self.config = ProjectConfig(project_path) if project_path else None
+        self._resolver = None
+
+    def get_resolver(self) -> BaseDependencyResolver:
+        if self._resolver is None:
+            from tostr.core.providers import LanguageProvider
+            self._resolver = LanguageProvider.get_resolver(self)
+        return self._resolver
     
+    @property
+    def language(self) -> str:
+        return self.config.language if self.config else "java"
+
     @property
     def files(self) -> List[BaseFile]:
         return [x for x in self.uid_map.values() if isinstance(x, BaseFile)]
@@ -107,11 +116,12 @@ class Registry:
         if hasattr(struct, 'inherits') and struct.inherits:
             for parent_name in struct.inherits:
                 # Use the class's own resolution logic to find the parent struct
-                if hasattr(struct, 'resolve_type'):
-                    parent = struct.resolve_type(parent_name)
-                    if parent:
-                        inherited_matches = self._resolve_methods_recursive(parent, name, arity, visited)
-                        if inherited_matches: return inherited_matches
+                # We use the resolver instead of model-specific resolve_type
+                resolver = self.get_resolver()
+                parent = resolver.resolve_type(struct, parent_name)
+                if parent:
+                    inherited_matches = self._resolve_methods_recursive(parent, name, arity, visited)
+                    if inherited_matches: return inherited_matches
         
         return []
 

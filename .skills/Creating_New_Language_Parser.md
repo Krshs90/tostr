@@ -55,6 +55,7 @@ Acts as a factory for specific builders (`File`, `Class`, `Method`, `Field`).
 ### `BaseFileBuilder`
 - Responsible for parsing a file and identifying its children (classes, functions, etc.).
 - Must handle imports and package/module names.
+- **Import Normalization:** To keep dependency resolution agnostic, normalize all imports into a standard `namespace.Member` or `namespace.*` format in the `imports` list.
 - **Python/Go Consideration:** Files often contain free-floating functions. Ensure these are added as children directly to the `BaseFile` object.
 
 ### `BaseClassBuilder`
@@ -85,11 +86,19 @@ DEPENDENCY_QUERY = """
 """
 ```
 
-## 5. Registration
+## 5. Dependency Resolution (`resolver.py`)
 
-Register the new language builders in `src/tostr/core/providers.py` so the `StructBuilderProvider` can serve them based on file extensions.
+Tostr uses a Strategy pattern for dependency resolution.
 
-## 6. Verification Checklist
+- **`BaseDependencyResolver`**: Handles generic resolution (local lookups, basic normalized import matching, receiver heuristics).
+- **Custom Resolvers**: If your language has unique resolution rules (e.g., specific wildcard behaviors or complex scoping), create a `<Lang>DependencyResolver` in `src/tostr/core/resolver.py` and register it in `Registry.get_resolver()`.
+
+## 6. Registration
+
+1. Register the new language builders in `src/tostr/core/providers.py` so the `StructBuilderProvider` can serve them based on file extensions.
+2. Update `Registry.get_resolver()` in `src/tostr/core/registry.py` if a custom resolver was implemented.
+
+## 7. Verification Checklist
 - [ ] Tree-sitter dependency added to `pyproject.toml` and `requirements.txt`.
 - [ ] `language.py` correctly exports the language object.
 - [ ] `builders.py` implements all necessary `from_node` methods.
