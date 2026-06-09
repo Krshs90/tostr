@@ -88,7 +88,7 @@ class Registry:
                 self.progress_tracker.enqueue('describe', 1)
                 self.progress_tracker.enqueue('embed', 1)
         
-    def resolve_methods(self, name: str, arity: int, parent_name: Optional[str] = None):
+    def resolve_methods(self, name: str, arity: Optional[int], parent_name: Optional[str] = None):
         if parent_name:
             if parent_name.endswith(".*"):
                 package_name = parent_name[:-2]
@@ -103,13 +103,13 @@ class Registry:
                 return self._resolve_methods_recursive(parent, name, arity, set())
             return []
             
-        return [x for x in self.methods if x.name == name and x.arity == arity]
+        return [x for x in self.methods if x.name == name and (arity is None or x.arity == arity)]
 
-    def _resolve_methods_recursive(self, struct: BaseStruct, name: str, arity: int, visited: set) -> List[BaseMethod]:
+    def _resolve_methods_recursive(self, struct: BaseStruct, name: str, arity: Optional[int], visited: set) -> List[BaseMethod]:
         if struct.uid in visited: return []
         visited.add(struct.uid)
 
-        matches = [x for x in struct.methods if x.name == name and x.arity == arity]
+        matches = [x for x in struct.methods if x.name == name and (arity is None or x.arity == arity)]
         if matches: return matches
 
         # 2. Inherited methods

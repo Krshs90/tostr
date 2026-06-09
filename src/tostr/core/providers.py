@@ -8,6 +8,7 @@ class LanguageProvider:
     # Maps language string to (package, builder_class, resolver_class)
     language_map = {
         "java": ("tostr.languages.java.builders", "JavaBuilder", "tostr.core.resolver.JavaDependencyResolver"),
+        "python": ("tostr.languages.python.builders", "PythonBuilder", "tostr.core.resolver.PythonDependencyResolver"),
     }
     
     @classmethod

@@ -153,6 +153,8 @@ class BaseStruct(ABC):
             self.diff_hash = hashlib.md5("".join(child_hashes).encode("utf-8")).hexdigest()
     
     def add_dependency(self, target: BaseStruct):
+        if target in self.outbound_dependencies:
+            return
         self.outbound_dependencies.add(target)
         self.outbound_dependency_names.add(target.uid)
         target.inbound_dependencies.add(self)
@@ -162,6 +164,8 @@ class BaseStruct(ABC):
                 self.parent.add_dependency(target.parent)
                 
     def add_fuzzy_dependency(self, target: BaseStruct):
+        if target in self.outbound_dependencies_fuzzy:
+            return
         self.outbound_dependencies_fuzzy.add(target)
         self.outbound_dependency_names.add('~' + target.uid)
         target.inbound_dependencies_fuzzy.add(self)
@@ -357,29 +361,41 @@ class BaseFile(BaseStruct):
     async def resolve_description_async(self, llm: LLMClient, embedder: EmbeddingClient = None):
         assert llm is not None, "LLMClient instance is required to resolve descriptions."
         
-        if self.description:
-            if self.registry and getattr(self.registry, "progress_tracker", None):
-                self.registry.progress_tracker.advance('describe', 1)
-                if self.vector is not None:
-                    self.registry.progress_tracker.advance('embed', 1)
-                elif embedder:
-                    embedder.enqueue(self)
-            return
-
+        # 1. Handle Recursion (Non-methods)
         if self.all_children:
             coroutine_list = [
                 child.resolve_description_async(llm, embedder) 
                 for child in self.all_children
+                if not isinstance(child, BaseMethod) # Methods are handled by this file below
             ]
-            await asyncio.gather(*coroutine_list)
+            if coroutine_list:
+                await asyncio.gather(*coroutine_list)
 
+        # 2. If already described, account for ourselves and our methods and exit
+        if self.description:
+            if self.registry and getattr(self.registry, "progress_tracker", None):
+                self.registry.progress_tracker.advance('describe', 1 + len(self.methods))
+                if self.vector is not None:
+                    self.registry.progress_tracker.advance('embed', 1)
+                elif embedder:
+                    embedder.enqueue(self)
+                
+                for m in self.methods:
+                    if m.vector is not None:
+                        self.registry.progress_tracker.advance('embed', 1)
+                    elif embedder:
+                        embedder.enqueue(m)
+            return
+
+        # 3. Handle simple cases
         if len(self.all_children) == 0:
             self.description = "Empty File"
             if self.registry and getattr(self.registry, "progress_tracker", None):
                 self.registry.progress_tracker.advance('describe', 1)
                 self.registry.progress_tracker.advance('embed', 1)
             return
-        if len(self.all_children) == 1:
+        
+        if len(self.all_children) == 1 and not isinstance(self.all_children[0], BaseMethod):
             self.description = self.all_children[0].description
             self.vector = self.all_children[0].vector
             if self.registry and getattr(self.registry, "progress_tracker", None):
@@ -387,14 +403,29 @@ class BaseFile(BaseStruct):
                 self.registry.progress_tracker.advance('embed', 1)
             return
         
+        # 4. Process this file and its methods
         logger.debug(f"Generating Description for file {self.uid}...")
 
+        method_lookup = {idx: m for idx, m in enumerate(self.methods) if not m.description}
+        
+        # Account for methods that already have descriptions
+        already_described = [m for m in self.methods if m.description]
+        if self.registry and getattr(self.registry, "progress_tracker", None) and already_described:
+            self.registry.progress_tracker.advance('describe', len(already_described))
+            for m in already_described:
+                if m.vector is not None:
+                    self.registry.progress_tracker.advance('embed', 1)
+                elif embedder:
+                    embedder.enqueue(m)
+
         input_data = {
-            c.uid: c.description for c in self.all_children
+            "described_components": {c.uid: c.description for c in self.all_children if c.description},
+            "un_described_methods": {str(idx): m.body for idx, m in method_lookup.items()}
         }
 
         class FileDescriptionSchema(BaseModel):
             description: str = Field(description="Description of the file")
+            description_map: dict[str, str] = Field(default_factory=dict, description="Mapping of method_id to description")
 
         response = await llm.generate_description(
             input_data=input_data,
@@ -405,13 +436,36 @@ class BaseFile(BaseStruct):
         if not response:
             logger.warning(f"⚠️ Skipping {self.uid} due to LLM failure")
             if self.registry and getattr(self.registry, "progress_tracker", None):
-                self.registry.progress_tracker.advance('embed', 1)
+                self.registry.progress_tracker.advance('describe', 1 + len(method_lookup))
+                self.registry.progress_tracker.advance('embed', 1 + len(method_lookup))
             return
 
         self.description = response.description
 
         if embedder is not None:
             embedder.enqueue(self)
+
+        handled_indices = set()
+        for idx_str, desc in response.description_map.items():
+            try:
+                idx = int(idx_str)
+            except (ValueError, TypeError):
+                continue
+            if idx in method_lookup:
+                method = method_lookup[idx]
+                method.description = desc
+                handled_indices.add(idx)
+                if embedder is not None:
+                    embedder.enqueue(method)
+
+        if handled_indices and self.registry and getattr(self.registry, "progress_tracker", None):
+            self.registry.progress_tracker.advance('describe', len(handled_indices))
+
+        # Handle any methods that were sent but not described by the LLM
+        missed_count = len(method_lookup) - len(handled_indices)
+        if missed_count > 0 and self.registry and getattr(self.registry, "progress_tracker", None):
+            self.registry.progress_tracker.advance('describe', missed_count)
+            self.registry.progress_tracker.advance('embed', missed_count)
 
         logger.debug(f"Successfully Generated Description for file {self.uid}")
 

@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 class BaseDependencyResolver:
     def __init__(self, registry: Registry):
         self.registry = registry
+        self.strict_arity = True
 
     def resolve_type(self, scope: BaseStruct, type_name: str) -> Optional[BaseStruct]:
         """Resolves a simple or scoped type name to a struct using imports and package info."""
@@ -72,7 +73,7 @@ class BaseDependencyResolver:
             search_scope = method.parent.children if method.parent else method.children
             for child_set in list(search_scope.values()):
                 for child in list(child_set):
-                    if child.name == name and getattr(child, "arity", -1) == arity:
+                    if child.name == name and (not self.strict_arity or getattr(child, "arity", -1) == arity):
                         method.add_dependency(child)
                         resolved = True
                         break
@@ -85,7 +86,8 @@ class BaseDependencyResolver:
                 if receiver_type:
                     dep_type = self.resolve_type(method.parent or method, receiver_type)
                     if dep_type:
-                        candidates = self.registry.resolve_methods(name=name, arity=arity, parent_name=dep_type.uid)
+                        lookup_arity = arity if self.strict_arity else None
+                        candidates = self.registry.resolve_methods(name=name, arity=lookup_arity, parent_name=dep_type.uid)
                         if candidates:
                             method.add_dependency(candidates[0])
                             continue
@@ -93,12 +95,18 @@ class BaseDependencyResolver:
             # 3. IMPORTED & INHERITED
             potential_parents = self._get_potential_lookup_parents(method)
             all_candidates = []
+            lookup_arity = arity if self.strict_arity else None
             for p_name in potential_parents:
-                candidates = self.registry.resolve_methods(name=name, arity=arity, parent_name=p_name)
+                candidates = self.registry.resolve_methods(name=name, arity=lookup_arity, parent_name=p_name)
                 all_candidates.extend(candidates)
             
             if len(all_candidates) == 1:
                 method.add_dependency(all_candidates[0])
+            elif not all_candidates:
+                # 4. TYPE RESOLUTION (Class instantiation or Type reference)
+                dep = self.resolve_type(method.parent or method, name)
+                if dep:
+                    method.add_dependency(dep)
             elif len(all_candidates) > 1:
                 # Apply heuristic: if receiver matches part of class name
                 refined_candidates = []
@@ -135,9 +143,18 @@ class BaseDependencyResolver:
                 if field.name == receiver:
                     return field.field_type
         
-        # 2. Check method parameters (if we had them stored explicitly, 
-        # but for now we might just have arity or signature string)
-        # TODO: Advanced parameter type parsing
+        # 2. Check if receiver matches an import (Module-based calls)
+        parent = method.parent
+        imports = getattr(parent, "imports", [])
+        if not imports and parent and parent.parent:
+            imports = getattr(parent.parent, "imports", [])
+            
+        # print(f"DEBUG: resolving receiver '{receiver}' against imports: {imports}")
+        for imp in imports:
+            if imp == receiver or imp.endswith(f".{receiver}"):
+                return imp
+
+        # 3. Check method parameters (TODO)
         
         return None
 
@@ -176,3 +193,9 @@ class BaseDependencyResolver:
 class JavaDependencyResolver(BaseDependencyResolver):
     """Specific tweaks for Java if necessary."""
     pass
+
+class PythonDependencyResolver(BaseDependencyResolver):
+    """Specific tweaks for Python if necessary."""
+    def __init__(self, registry: Registry):
+        super().__init__(registry)
+        self.strict_arity = False
