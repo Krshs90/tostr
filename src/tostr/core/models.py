@@ -234,7 +234,12 @@ class Directory(BaseStruct):
     
     def __init__(self, path, registry=None, parent=None, uid=None):
         uid = uid or str(path)
-        super().__init__(name=path.name, path=path, uid=uid, registry=registry, parent=parent)
+        name = path.name
+        # Handle the root directory case where path.name is empty for Path('.')
+        if not name and registry and registry.project_path and str(path) == ".":
+            name = registry.project_path.name
+
+        super().__init__(name=name, path=path, uid=uid, registry=registry, parent=parent)
     
     async def resolve_description_async(self, llm: LLMClient = None, embedder: EmbeddingClient = None):
         assert llm is not None, "LLMClient instance is required to resolve descriptions."
@@ -295,52 +300,6 @@ class Directory(BaseStruct):
             embedder.enqueue(self)
 
         logger.debug(f"Successfully Generated Description for directory {self.uid}")
-    
-    def parse_children(self):
-        if self.path is None:
-            logger.error(f"{self} has no path")
-            return
-        
-        # Ensure we use an absolute path for globbing if it's relative
-        full_path = self.path
-        if not full_path.is_absolute() and self.registry:
-            full_path = self.registry.project_path / self.path
-
-        for path in full_path.glob("*"):
-            if self.registry.config.is_ignored(path):
-                logger.debug(f"Skipping \'{path}\' due to path ignore rules")
-                continue
-            else:
-                if path.is_dir():
-                    logger.debug(f"🔍 Parsing directory \'{path}\'")
-                    relative_path = self.registry.relative_to_project(path)
-                    directory = Directory(path=relative_path, registry=self.registry, parent=self)
-                    self.registry.add_struct(directory)
-                    self.add_child(directory)
-                    directory.parse_children()
-                else:
-                    logger.debug(f"Attempting to resolve builder for suffix {path.parts[-1]}")
-                    try:
-                        if self.registry.config.is_ignored(path):
-                            logger.debug(f"Skipping \'{path}\' due to path ignore rules")
-                            continue
-                        from tostr.core.providers import LanguageProvider
-                        builder = LanguageProvider.get_builder(self.registry)
-                        if not builder.handles_extension(path.suffix):
-                            continue
-                        
-                    except LanguageNotSupportedError as e:
-                        continue
-                    instance = builder.build_file().from_path(path, parent=self)
-                    
-                    # Calculate file hash from children if any exist
-                    instance.calculate_distributed_hash()
-
-                    self.registry.add_struct(instance)
-                    self.add_child(instance)
-        
-        # Calculate directory hash from its direct children
-        self.calculate_distributed_hash()
     
     def to_dict(self) -> dict:
         data = super().to_dict()

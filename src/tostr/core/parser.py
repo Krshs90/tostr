@@ -32,6 +32,10 @@ class BaseParser(ABC):
         await self.resolve_descriptions_async()
         
     def parse_path(self, subpath: Path, parent: Directory = None):
+        if self.registry.config.is_ignored(subpath):
+            logger.debug(f"Skipping '{subpath}' due to path ignore rules")
+            return
+
         if subpath.is_dir():
             logger.debug(f"🔍 Parsing directory '{subpath}'")
             
@@ -46,12 +50,12 @@ class BaseParser(ABC):
                 root = parent
 
             for path in subpath.glob("*"):
+                # Always check ignore rules before recursion or file parsing
                 if self.registry.config.is_ignored(path):
                     logger.debug(f"Skipping '{path}' due to path ignore rules")
                     continue
                 
                 relative_path = self.registry.relative_to_project(path)
-                existing = self.registry.get_struct_by_uid(str(relative_path))
                 
                 if path.is_dir():
                     directory = Directory(path=relative_path, registry=self.registry, parent=root)
