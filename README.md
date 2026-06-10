@@ -1,5 +1,5 @@
 <p align="center">
-    <a href="https://toastedtools.com/"><img src="./resources/logo.png" alt="Tostr Logo" width="816"></a>
+    <a href="https://tostr.ai/"><img src="./resources/logo.png" alt="Tostr Logo" width="816"></a>
 </p>
 
 <h1 align="center">
@@ -32,6 +32,23 @@ The AST IR and Dependency Graph is cached to an on-drive SQLite .db file to vast
 
 ### 💭 Semantic Vector Embedding 
 Using local ONNX (Open Neural Network Exchange) weights from the all-MiniLM-L6-v2 embedding model, Tostr embeds the descriptions of each struct, allowing for far more accurate semantic search of specific structs than the traditional line blocking approach.
+
+## 🌍 Language Support Matrix
+
+Tostr is designed to map the macro-architecture of your codebase. While all supported languages receive high-density **Structural AST Skeletons** and **AI Semantic Descriptions**, multi-hop cross-file dependency resolution is currently optimized specifically for deep backend monoliths (Java). 
+
+| Language | Structural AST Parsing | AI Semantic Descriptions | Cross-File Dependency Graph |
+| :--- | :---: | :---: | :---: |
+| **☕ Java** | ✅ | ✅ | ✅ |
+| **🐍 Python** | ✅ | ✅ | 🚧 Coming Soon |
+| **🔷 TypeScript** | 🚧 Coming Soon | 🚧 Coming Soon | 🚧 Coming Soon |
+| **🎯 C#** | 🚧 Coming Soon | 🚧 Coming Soon | 🚧 Coming Soon |
+| **🐹 Go** | 🚧 Coming Soon | 🚧 Coming Soon | 🚧 Coming Soon |
+
+*Tostr is still in active development, so this list will quickly expand and grow with more language support. If you want to add support for your favorite language, you can also take a look at [CONTRIBUTING.md](https://github.com/rubyTanuki/tostr/blob/main/CONTRIBUTING.md) to help us out!*
+
+> **Note for AI Agents:** For languages where dependency tracking is marked "Coming Soon," the MCP server will cleanly omit the dependency fields. Agents should rely on `tostr skeleton` and semantic `search` to navigate these codebases.
+
 
 # Getting Started
 
@@ -122,13 +139,11 @@ Before being able to use Tostr, the repository must be initialized using the CLI
 
 To manually initialize the repository, `cd` to the root of the project in a terminal window and run:
 ```
-tostr init . --ignore [LANGUAGE]
+tostr init . --language [LANGUAGE]
 ```
-This creates the `.tostr` directory and initializes the default `.tostrignore` to exclude environment files, node_modules, build artifacts, and other files which are not needed in the project AST based on the desired language.
+This creates the `.tostr` directory and initializes the default `.tostrignore` to exclude environment files, node_modules, build artifacts, and other files which are not needed in the project AST based on the desired language. It also creates a `config.toml` in your project's `.tostr/` directory, storing the projects configurations. Currently this is only the language, but more will be configured here in the future.
 
-The ignore flag is optional, but certainly helpful to speed up parsing by skipping entire file directories without trying to parse them. The ignore file can always be edited later on after initialization, by editing the file at `./.tostrignore`.
-
-> Tostr currently only supports .java (.py on the way), so the options for --ignore are 'java' and 'default', which is a language agnostic ignore for generic files like .exe or /.git
+> Tostr currently only supports .java and .py, so the options for --language are 'java', 'python', and 'default', which is a language agnostic ignore for generic files like .exe or /.git.
 
 If you are running tostr on a project that already has an existing database but you want to reparse from the start, use the `--no-cache` flag.
 
