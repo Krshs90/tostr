@@ -39,7 +39,7 @@ def calculate_total(self, items, tax=0.1):
     method_obj = builder.from_node(method_node, parent=mock_parent_class)
     
     assert method_obj.name == "calculate_total"
-    assert method_obj.arity == 3 # self, items, tax
+    assert method_obj.arity == 2  # self excluded; items + tax
     assert "def calculate_total(self, items, tax=0.1)" in method_obj.signature
     
     # Check dependencies
