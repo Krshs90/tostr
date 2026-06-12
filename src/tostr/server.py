@@ -93,7 +93,7 @@ async def init(workspace_path: str, use_cache: bool = True, language: str = "jav
     Args:
         workspace_path: The ABSOLUTE path to the project workspace. DO NOT use '.' or relative paths. If you only have a relative path, you must determine the absolute path of the current workspace first.
         use_cache: Whether to use the existing AST cache. If False, forces a full re-parse.
-        language: The primary language of the project (e.g., 'java', 'python').
+        language: The primary language of the project (e.g., 'java', 'python'). **Defaults to 'java'.**
     """
     
     target_path = Path(workspace_path)

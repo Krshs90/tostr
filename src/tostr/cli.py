@@ -242,8 +242,7 @@ def init(
                 TaskProgressColumn(),
                 TimeElapsedColumn(),
             ) as progress:
-                resolvable: bool = language in {"java"}
-                progress_tracker = ProgressTracker(progress, include_resolve=resolvable)
+                progress_tracker = ProgressTracker(progress)
                 asyncio.run(init_async(path, use_cache, language, progress_tracker))
                 progress_tracker.finish()
     except TostrError as e:
