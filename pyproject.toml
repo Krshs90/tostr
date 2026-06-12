@@ -26,7 +26,8 @@ dependencies = [
     "fastmcp",
     "pathspec",
     "sqlite-vec",
-    "onnxruntime"
+    "onnxruntime",
+    "tokenizers"
 ]
 
 [project.scripts]
