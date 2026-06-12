@@ -40,7 +40,7 @@ Tostr is designed to map the macro-architecture of your codebase. While all supp
 | Language | Structural AST Parsing | AI Semantic Descriptions | Cross-File Dependency Graph |
 | :--- | :---: | :---: | :---: |
 | **☕ Java** | ✅ | ✅ | ✅ |
-| **🐍 Python** | ✅ | ✅ | 🚧 Coming Soon |
+| **🐍 Python** | ✅ | ✅ | ✅ |
 | **🔷 TypeScript** | 🚧 Coming Soon | 🚧 Coming Soon | 🚧 Coming Soon |
 | **🎯 C#** | 🚧 Coming Soon | 🚧 Coming Soon | 🚧 Coming Soon |
 | **🐹 Go** | 🚧 Coming Soon | 🚧 Coming Soon | 🚧 Coming Soon |
