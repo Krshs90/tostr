@@ -214,3 +214,7 @@ __marimo__/
 *.sln
 
 tests/testcode/*
+
+# Tostr generated artifacts
+.tostr/
+.tostrignore
