@@ -32,7 +32,7 @@ The dotted name that *source code* uses to refer to a struct: `app.services.user
 - `package` is persisted to the DB. Never skip it — watcher-time partial reparses resolve imports against the DB, not memory.
 - `registry.get_struct_by_uid()` accepts both forms: exact UIDs match directly; dotted logical names fall back to package translation. Never hand-construct UIDs from dotted names in resolvers — go through the registry.
 
-> **Known deviation:** the Java builder currently emits `package.Class...` UIDs when a package declaration exists (the UID doubles as the logical name). This predates this definition and only survives because Java file UIDs equal their `path` column. Do NOT imitate it — new languages must follow the definition above. Java migration to this spec is planned.
+Both shipped languages follow this definition. Java derives `package` from the `package` declaration (`com.example`); Python derives it from the file's path relative to the project root (`app.services.user_service`). Either way the code-struct UID is `<file-path>#<Code.path(params)>`, never the dotted name.
 
 ---
 

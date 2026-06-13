@@ -124,13 +124,10 @@ class JavaClassBuilder(BaseClassBuilder):
         
         uid = ""
         if isinstance(parent, BaseFile):
-            if parent.package:
-                uid = f"{parent.package}.{name}"
-            else:
-                uid = f"{parent.uid}#{name}"
+            uid = f"{parent.uid}#{name}"
         else:
             uid = f"{parent.uid}.{name}"
-        
+
         instance = BaseClass(
            # BaseStruct
             name=name,
@@ -231,10 +228,7 @@ class JavaMethodBuilder(BaseMethodBuilder):
         
         uid = ""
         if isinstance(parent, BaseFile):
-            if parent.package:
-                uid = f"{parent.package}.{name}{parameters_string}"
-            else:
-                uid = f"{parent.uid}#{name}{parameters_string}"
+            uid = f"{parent.uid}#{name}{parameters_string}"
         else:
             uid = f"{parent.uid}.{name}{parameters_string}"
         
@@ -310,10 +304,7 @@ class JavaFieldBuilder(BaseFieldBuilder):
         
         uid = ""
         if isinstance(parent, BaseFile):
-            if parent.package:
-                uid = f"{parent.package}.{name}"
-            else:
-                uid = f"{parent.uid}#{name}"
+            uid = f"{parent.uid}#{name}"
         else:
             uid = f"{parent.uid}.{name}"
 

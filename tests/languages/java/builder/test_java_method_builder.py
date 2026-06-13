@@ -25,9 +25,9 @@ def mock_parent_class():
     """Mocks the BaseClass parent needed for UID generation."""
     mock_cls = MagicMock(
         spec=BaseClass,
-        uid="com.example.OuterClass",
+        uid="com/example/OuterClass.java#OuterClass",
         name="OuterClass",
-        parent=MagicMock(spec=BaseFile, package="com.example"),
+        parent=MagicMock(spec=BaseFile, uid="com/example/OuterClass.java", package="com.example"),
         imports=["java.util.*", "com.example.dep.Dependency"],
         fields=[MagicMock(name="myService", field_type="MyService")]
     )
@@ -81,7 +81,7 @@ def test_java_method_builder_extracts_complex_method(java_parser, mock_registry,
     assert method_obj.arity == 2, f"Expected arity 2, got {method_obj.arity}"
     
     # UID Test (Crucial for method overloading support)
-    expected_uid = "com.example.OuterClass.processData(int, String)"
+    expected_uid = "com/example/OuterClass.java#OuterClass.processData(int, String)"
     assert method_obj.uid == expected_uid, f"Expected {expected_uid}, got {method_obj.uid}"
 
 
@@ -94,5 +94,5 @@ def test_java_method_builder_extracts_complex_method(java_parser, mock_registry,
     assert "void ping()" in simple_obj.signature
     
     # Check empty parameter UID
-    expected_simple_uid = "com.example.OuterClass.ping()"
+    expected_simple_uid = "com/example/OuterClass.java#OuterClass.ping()"
     assert simple_obj.uid == expected_simple_uid, f"Expected {expected_simple_uid}, got {simple_obj.uid}"

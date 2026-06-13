@@ -66,7 +66,7 @@ def test_java_class_builder_extracts_complex_class(java_parser, mock_registry, m
 
     # 1. Test BaseStruct Properties
     assert class_obj.name == "DataProcessor"
-    assert class_obj.uid == f"{mock_parent_file.package}.DataProcessor"
+    assert class_obj.uid == f"{mock_parent_file.uid}#DataProcessor"
     assert class_obj.parent == mock_parent_file
 
     # 2. Test Signature Extraction

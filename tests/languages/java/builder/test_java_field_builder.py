@@ -25,9 +25,9 @@ def mock_parent_class():
     """Mocks the BaseClass parent needed for UID generation."""
     mock_cls = MagicMock(
         spec=BaseClass,
-        uid="com.example.TestClass",
+        uid="com/example/TestClass.java#TestClass",
         name="TestClass",
-        parent=MagicMock(spec=BaseFile, uid="com/tostr/Constants.java", package="com.tostr")
+        parent=MagicMock(spec=BaseFile, uid="com/example/TestClass.java", package="com.example")
     )
     return mock_cls
 
@@ -72,7 +72,7 @@ def test_java_field_builder_extracts_fields(java_parser, mock_registry, mock_par
     assert "This comment should be ignored" not in tau_field.signature
     
     # UID Test (Ensuring NO type information is appended to fields)
-    expected_tau_uid = "com.example.TestClass.TAU"
+    expected_tau_uid = "com/example/TestClass.java#TestClass.TAU"
     assert tau_field.uid == expected_tau_uid, f"Expected \'{expected_tau_uid}\\' , got \'{tau_field.uid}\'"
 
 
@@ -86,5 +86,5 @@ def test_java_field_builder_extracts_fields(java_parser, mock_registry, mock_par
     expected_users_sig = "private List<String> activeUsers"
     assert users_field.signature == expected_users_sig
     
-    expected_users_uid = "com.example.TestClass.activeUsers"
+    expected_users_uid = "com/example/TestClass.java#TestClass.activeUsers"
     assert users_field.uid == expected_users_uid
