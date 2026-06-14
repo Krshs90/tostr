@@ -7,7 +7,7 @@ Frontloading Agentic AI Code Context
 </h1>
 
 <p align="center">
-    <img src="./resources/demo.gif" alt="Demo GIF" width="860">
+    <video src="resources/demo.mp4" autoplay loop muted playsinline></video>
 </p>
 
 <p align="center">
