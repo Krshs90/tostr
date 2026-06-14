@@ -520,7 +520,7 @@ def skeleton(
         typer.Option(
             "--depth",
             "-d",
-            help="Depth to traverse for skeleton generation (default: 4)"
+            help="Depth of directory/file/class nesting to traverse (default: 4). Class members are never expanded; only top-level functions on a file are shown. Use inspect for a class's or file's members."
         )
     ] = 4,
     files_only: Annotated[

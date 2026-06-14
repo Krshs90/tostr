@@ -62,6 +62,12 @@ class tost:
             if obj.classes and not files_only:
                 for c in obj.classes:
                     children.append(cls.dump_skeleton(c, files_only=files_only, depth=depth-1))
+            # Surface top-level (module-level) functions that live directly on a file,
+            # e.g. Python modules of free functions with no enclosing class. Class members
+            # are deliberately excluded: the class remains the floor for its own subtree.
+            if isinstance(obj, BaseFile) and not files_only:
+                for m in obj.methods:
+                    children.append(SkeletonResult(id=m.id, uid=m.uid, type=type(m).__name__))
 
         return SkeletonResult(
             id=obj.id,

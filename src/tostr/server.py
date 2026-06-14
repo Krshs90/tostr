@@ -341,7 +341,7 @@ async def search(query: str, filter: str = None, top_k: int = 5) -> str:
         return f"Error: {e}"
 
 @mcp.tool()
-async def skeleton(subpath: str, files_only: bool = False, depth: int = 7, max_lines: int = 500) -> str:
+async def skeleton(subpath: str, files_only: bool = False, depth: int = 4, max_lines: int = 500) -> str:
     """
     Output the AST skeleton for a subpath. 
     ALWAYS use this before calling `read_file` or `list_files` to understand the 
@@ -350,7 +350,7 @@ async def skeleton(subpath: str, files_only: bool = False, depth: int = 7, max_l
     Args:
         subpath: File or directory path relative to the project root to generate a skeleton for.
         files_only: If True, only include files and directories, excluding any code structs. Default is False, which includes all structs.
-        depth: The AST depth of the skeleton to display. Default is 7, which includes most details but can be adjusted for deeper trees.
+        depth: Controls directory/file/class nesting. Default is 4. Class members (methods/fields) are never expanded in the skeleton; only top-level functions that live directly on a file are shown. Inspect a class or file to see its members.
         max_lines: Maximum number of lines to include in the output (default: 500).
     """
     if not session.is_initialized:
