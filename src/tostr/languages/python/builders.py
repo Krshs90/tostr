@@ -232,34 +232,42 @@ class PythonMethodBuilder(BaseMethodBuilder):
             name = name_node.text.decode('utf-8').strip()
         
         # PARAMETERS
+        # We keep two views: `parameters` carries the full typed/defaulted text for the
+        # human-facing signature (surfaced by `inspect`), while `uid_parameters` is the
+        # bare-name-only view used to build the UID. Python has no overloading, so names
+        # + arity uniquely identify a method; embedding full type hints just bloats the
+        # UID (and every skeleton line that renders it).
         parameters = []
+        uid_parameters = []
         params_node = node.child_by_field_name('parameters')
         if params_node:
             for param in params_node.named_children:
-                # In Python, we just care about the number of parameters for arity
-                param_text = param.text.decode('utf-8').strip()
-                # Collapse whitespace/newlines and truncate long default values
-                param_text = re.sub(r'\s+', ' ', param_text)
-                if len(param_text) > 50:
-                    param_text = param_text[:47] + "..."
-                parameters.append(param_text)
-            
+                # Collapse whitespace/newlines.
+                param_text = re.sub(r'\s+', ' ', param.text.decode('utf-8').strip())
+                # Full signature param: truncate long type hints / default values.
+                parameters.append(param_text if len(param_text) <= 50 else param_text[:47] + "...")
+                # UID param: strip the type annotation and default value, keeping any
+                # */** prefix (e.g. "x: int = 5" -> "x", "*args" -> "*args").
+                uid_parameters.append(param_text.split('=')[0].split(':')[0].strip())
+
         # Exclude self/cls from arity — callers never pass them.
-        first_bare = parameters[0].split('=')[0].split(':')[0].strip() if parameters else ""
-        arity_params = parameters[1:] if first_bare in ('self', 'cls') else parameters
+        first_bare = uid_parameters[0] if uid_parameters else ""
+        arity_params = uid_parameters[1:] if first_bare in ('self', 'cls') else uid_parameters
         arity = len(arity_params)
-        parameters_string = f"({', '.join(parameters)})"
-        
-        # SIGNATURE
-        signature = f"def {name}{parameters_string}"
-        
+
+        signature_params = f"({', '.join(parameters)})"
+        uid_params = f"({', '.join(uid_parameters)})"
+
+        # SIGNATURE (retains full type detail for `inspect`)
+        signature = f"def {name}{signature_params}"
+
         uid = ""
         if isinstance(parent, BaseFile):
-            uid = f"{parent.uid}#{name}{parameters_string}"
+            uid = f"{parent.uid}#{name}{uid_params}"
         elif parent:
-            uid = f"{parent.uid}.{name}{parameters_string}"
+            uid = f"{parent.uid}.{name}{uid_params}"
         else:
-            uid = f"{name}{parameters_string}"
+            uid = f"{name}{uid_params}"
 
         dependency_names = []
         query = Query(PYTHON_LANGUAGE, DEPENDENCY_QUERY)
