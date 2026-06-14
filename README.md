@@ -7,7 +7,7 @@ Frontloading Agentic AI Code Context
 </h1>
 
 <p align="center">
-    <video src="resources/demo.mp4" autoplay loop muted playsinline></video>
+    <img src="./resources/demo.gif" alt="Demo GIF" width="860">
 </p>
 
 <p align="center">
@@ -170,8 +170,8 @@ Tostr will print a beautiful tree structure of your root and its direct children
 
 **Available Flags**:
 - `--pretty`, `--raw`: Pretty format output with line wrapping and indentation (disable for raw output). Default is `True`
-- `--depth`, `-d`: Depth of directory/file/class nesting to traverse. Class members (methods/fields) are never expanded in the skeleton — the class is the floor for its own subtree — so cranking depth high is safe and just reveals more structure. The one exception is top-level functions that live directly on a file (e.g. Python modules of free functions with no enclosing class), which are shown. Inspect a class or file to see its members. Default is `4`
-- `--files-only`, `-f`: Only generate the skeleton for files and directories, skipping classes and top-level functions. Default is `False`
+- `--depth`, `-d`: Depth to traverse for skeleton generation. Default is `4`
+- `--files-only`, `-f`: Only generate the skeleton for files, skipping individual classes/methods. Default is `False`
 - `--max-lines`, `-m`: Maximum number of lines to include in the output. Default is `500`
 - `--debug`, `--no-debug`: Enable debug logging. Default is `False`
 
