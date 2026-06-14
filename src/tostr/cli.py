@@ -216,9 +216,9 @@ def init(
         typer.Option(
             "--language",
             "-l",
-            help="The primary language of the project (e.g., 'java', 'python')"
+            help="Restrict parsing to one language (e.g., 'java', 'python'). Omit to auto-detect and parse all supported languages by extension."
         )
-    ] = "java",
+    ] = "auto",
     no_llm: Annotated[
         bool,
         typer.Option(

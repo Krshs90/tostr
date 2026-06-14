@@ -11,10 +11,7 @@ from tostr.languages.python.queries import DEPENDENCY_QUERY
 from tostr.core.models import *
 
 class PythonBuilder(BaseBuilder):
-    def handles_extension(self, ext: str) -> bool:
-        return ext.lower() == ".py"
-
-    def build_file(self) -> PythonFileBuilder: 
+    def build_file(self) -> PythonFileBuilder:
         return PythonFileBuilder(self.registry)
     def build_class(self) -> PythonClassBuilder: 
         return PythonClassBuilder(self.registry)

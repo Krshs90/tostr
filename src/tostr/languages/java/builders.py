@@ -11,10 +11,7 @@ from tostr.languages.java.queries import DEPENDENCY_QUERY
 from tostr.core.models import *
 
 class JavaBuilder(BaseBuilder):
-    def handles_extension(self, ext: str) -> bool:
-        return ext.lower() == ".java"
-
-    def build_file(self) -> JavaFileBuilder: 
+    def build_file(self) -> JavaFileBuilder:
         return JavaFileBuilder(self.registry)
     def build_class(self) -> JavaClassBuilder: 
         return JavaClassBuilder(self.registry)

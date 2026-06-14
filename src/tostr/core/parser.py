@@ -9,7 +9,6 @@ from tostr.core.models import BaseFile, Directory, BaseStruct
 from tostr.core.registry import Registry
 from tostr.core.providers import LanguageProvider
 from tostr.core.describer import LLMDescriber, NoLLMDescriber
-from tostr.exceptions import LanguageNotSupportedError
 
 class BaseParser(ABC):
     def __init__(self, project_dir: str, llm=None, embedder=None, registry: Registry=None):
@@ -17,7 +16,6 @@ class BaseParser(ABC):
         self.llm = llm
         self.embedder = embedder
         self.registry = registry
-        self.langs_with_dependency_support = {"java", "python"}
     
     @property
     def files(self):
@@ -31,8 +29,9 @@ class BaseParser(ABC):
 
         self.parse_path(subpath)
 
-        if self.registry.language in self.langs_with_dependency_support:
-            self.resolve_dependencies()
+        # Dependency resolution is routed per-file by extension, so it is safe to
+        # always run it; files in languages without a resolver are simply skipped.
+        self.resolve_dependencies()
 
         await self.resolve_descriptions_async()
         
@@ -88,12 +87,8 @@ class BaseParser(ABC):
             logger.debug(f"Skipping '{subpath}' due to path ignore rules")
             return None
 
-        try:
-            builder = LanguageProvider.get_builder(self.registry)
-            if not builder.handles_extension(subpath.suffix):
-                return None
-        except LanguageNotSupportedError as e:
-            logger.warning(str(e))
+        builder = LanguageProvider.get_builder(self.registry, subpath.suffix)
+        if builder is None:
             return None
         file_obj = builder.build_file().from_path(subpath, parent=parent)
         return file_obj

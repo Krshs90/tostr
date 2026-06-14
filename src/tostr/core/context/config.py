@@ -39,7 +39,8 @@ class ProjectConfig:
 
     @property
     def language(self) -> str:
-        return self.toml_config.get("project", {}).get("language", "java")
+        # "auto" parses every supported language, routed per-file by extension.
+        return self.toml_config.get("project", {}).get("language", "auto")
     
     def _init_toml_config(self, project_path: Path) -> Dict:
         toml_path = project_path / ".tostr" / "config.toml"
