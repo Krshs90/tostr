@@ -330,11 +330,11 @@ def _render_inspect(result: Union[InspectResult, str], pretty: bool = True, lang
     # Files / Directories recursion (limited to 1 level for inspect usually)
     if result.files:
         for f in result.files:
-            console.print(Text(f"File: {f.filepath}", style="bold blue"))
+            console.print(Text(f"File: {f.id} | {f.filepath}", style="bold blue"))
     
     if result.directories:
         for d in result.directories:
-            console.print(Text(f"Directory: {d.filepath}", style="bold yellow"))
+            console.print(Text(f"Directory: {d.id} | {d.filepath}", style="bold yellow"))
 
     # Body
     if result.body:
