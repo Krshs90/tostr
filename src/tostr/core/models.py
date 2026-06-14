@@ -7,7 +7,6 @@ import hashlib
 from pathlib import Path
 
 from loguru import logger
-from tostr.exceptions import LanguageNotSupportedError
 
 if TYPE_CHECKING:
     from tostr.core.registry import Registry
@@ -64,6 +63,12 @@ class BaseStruct(ABC):
         self._type_caches[type_cls] = children
         return children
     
+    @property
+    def extension(self) -> str:
+        """File extension this struct originates from (e.g. '.py'), used to route
+        language-specific builders/resolvers. Empty when the struct has no path."""
+        return Path(self.path).suffix.lower() if self.path else ""
+
     @property
     def all_children(self):
         if self._all_children_cache is not None: return self._all_children_cache
@@ -305,7 +310,7 @@ class BaseClass(BaseCodeStruct):
     
     def resolve_dependencies(self):
         # logger.debug(f"Resolving dependencies for {self}")
-        resolver = self.registry.get_resolver()
+        resolver = self.registry.get_resolver(self.extension)
 
         # resolve child dependencies
         super().resolve_dependencies()
@@ -386,7 +391,7 @@ class BaseMethod(BaseCodeStruct):
 
     def resolve_dependencies(self):
         logger.debug(f"Resolving dependencies for method {self.uid}")
-        resolver = self.registry.get_resolver()
+        resolver = self.registry.get_resolver(self.extension)
         resolver.resolve_method_dependencies(self)
         
         if self.registry and self.registry.progress_tracker:

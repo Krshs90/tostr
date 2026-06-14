@@ -13,9 +13,6 @@ class BaseBuilder(ABC):
     def __init__(self, registry: Registry):
         self.registry = registry
 
-    def handles_extension(self, ext: str) -> bool:
-        return False
-    
     def with_type(self, struct_type: str) -> BaseBuilder:
         match(struct_type):
             case "file": return self.build_file()

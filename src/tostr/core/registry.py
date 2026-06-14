@@ -32,13 +32,14 @@ class Registry:
         self.root: Optional[BaseStruct] = None
         self.db = db
         self.config = ProjectConfig(project_path) if project_path else None
-        self._resolver = None
+        self._resolvers: Dict[Optional[str], BaseDependencyResolver] = {}
 
-    def get_resolver(self) -> BaseDependencyResolver:
-        if self._resolver is None:
-            from tostr.core.providers import LanguageProvider
-            self._resolver = LanguageProvider.get_resolver(self)
-        return self._resolver
+    def get_resolver(self, ext: str = "") -> BaseDependencyResolver:
+        from tostr.core.providers import LanguageProvider
+        lang = LanguageProvider.language_for_extension(ext)
+        if lang not in self._resolvers:
+            self._resolvers[lang] = LanguageProvider.get_resolver(self, ext)
+        return self._resolvers[lang]
     
     @property
     def language(self) -> str:
@@ -119,7 +120,7 @@ class Registry:
             for parent_name in struct.inherits:
                 # Use the class's own resolution logic to find the parent struct
                 # We use the resolver instead of model-specific resolve_type
-                resolver = self.get_resolver()
+                resolver = self.get_resolver(struct.extension)
                 parent = resolver.resolve_type(struct, parent_name)
                 if parent:
                     inherited_matches = self._resolve_methods_recursive(parent, name, arity, visited)

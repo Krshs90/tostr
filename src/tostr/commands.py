@@ -12,8 +12,9 @@ from tostr.semantic.llm import LLMClient, GeminiStrategy
 from tostr.semantic.embeddings import EmbeddingClient, EmbeddingStrategy, OnnxEmbeddingStrategy
 from tostr.core import Registry, tost, InspectResult, SkeletonResult, SearchResult, BaseParser, SQLiteCache, BaseCodeStruct
 from tostr.core.context.config import ProjectConfig
+from tostr.core.providers import LanguageProvider
 
-from tostr.exceptions import APIKeyError, StructNotFoundError, DatabaseNotFoundError
+from tostr.exceptions import APIKeyError, DatabaseNotFoundError
 
 def _verify_db_exists(target_path: Path):
     if not os.path.exists(target_path):
@@ -107,9 +108,13 @@ def _write_default_ignore(target_path: Path, ignore_type: str):
     else:
         logger.warning(f"No default ignore template found for {ignore_type} at {template_path}")
 
-async def init_async(target_path: Path, use_cache: bool = True, language: str = "java", progress_tracker: "ProgressTracker" = None, no_llm: bool = False):
-    """Core asynchronous logic for scraping and parsing."""
-    
+async def init_async(target_path: Path, use_cache: bool = True, language: str = "auto", progress_tracker: "ProgressTracker" = None, no_llm: bool = False):
+    """Core asynchronous logic for scraping and parsing.
+
+    language="auto" (the default) parses every supported language, routing builders and
+    resolvers per-file by extension. Passing an explicit language restricts parsing to it.
+    """
+
     # Ensure .tostr directory exists
     tostr_dir = target_path / ".tostr"
     tostr_dir.mkdir(exist_ok=True)
@@ -120,8 +125,13 @@ async def init_async(target_path: Path, use_cache: bool = True, language: str = 
     with open(config_path, 'w') as f:
         f.write(config_content)
 
-    # Write default ignore for the language
-    _write_default_ignore(target_path, language)
+    # Write default ignores. In auto mode, lay down every supported language's
+    # ignore template so things like venv/ (python) and target/ (java) are covered.
+    if language == "auto":
+        for lang in LanguageProvider.language_map:
+            _write_default_ignore(target_path, lang)
+    else:
+        _write_default_ignore(target_path, language)
 
     # Parse and resolve AST
     parser = await _build_ast_async(target_path, use_cache=use_cache, progress_tracker=progress_tracker, no_llm=no_llm)
