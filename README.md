@@ -143,7 +143,9 @@ tostr init . --language [LANGUAGE]
 ```
 This creates the `.tostr` directory and initializes the default `.tostrignore` to exclude environment files, node_modules, build artifacts, and other files which are not needed in the project AST based on the desired language. It also creates a `config.toml` in your project's `.tostr/` directory, storing the projects configurations. Currently this is only the language, but more will be configured here in the future.
 
-> Tostr currently only supports .java and .py, so the options for --language are 'java', 'python', and 'default', which is a language agnostic ignore for generic files like .exe or /.git.
+The `--language` flag is optional. If none is provided, tostr will parse each file which has a supported file extension, treating them all as valid dependency nodes. If you choose a specific language extension, only that extension will be parsed. Also, if no language extension is explicitly chosen, the .tostrignore will be initialized with a default, agnostic ignore file.
+
+> Tostr currently only supports .java and .py, so the options for --language are 'java', 'py'.
 
 If you are running tostr on a project that already has an existing database but you want to reparse from the start, use the `--no-cache` flag.
 
