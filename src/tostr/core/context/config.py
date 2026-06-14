@@ -62,15 +62,18 @@ class ProjectConfig:
         if not self.project_path:
             return False
 
-        # 1. Convert to a POSIX string relative to the project root
+        # 1. Convert to a POSIX string relative to the project root.
+        # Relative inputs are anchored to project_path, NOT the process CWD
+        # (which is what Path.absolute() would otherwise use for a relative path).
+        anchored = file_path if file_path.is_absolute() else self.project_path / file_path
         try:
-            # We prefer absolute() over resolve() to avoid following symlinks 
+            # We prefer absolute() over resolve() to avoid following symlinks
             # that point outside the project tree during logical traversal.
-            relative_path = file_path.absolute().relative_to(self.project_path.absolute()).as_posix()
+            relative_path = anchored.absolute().relative_to(self.project_path.absolute()).as_posix()
         except ValueError:
             # Fallback to resolve() if they are in different places but logically linked
             try:
-                relative_path = file_path.resolve().relative_to(self.project_path.resolve()).as_posix()
+                relative_path = anchored.resolve().relative_to(self.project_path.resolve()).as_posix()
             except ValueError:
                 # If the file is outside the project root, we should probably ignore it
                 return True

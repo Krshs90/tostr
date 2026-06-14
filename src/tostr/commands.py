@@ -11,6 +11,7 @@ from functools import lru_cache
 from tostr.semantic.llm import LLMClient, GeminiStrategy
 from tostr.semantic.embeddings import EmbeddingClient, EmbeddingStrategy, OnnxEmbeddingStrategy
 from tostr.core import Registry, tost, InspectResult, SkeletonResult, SearchResult, BaseParser, SQLiteCache, BaseCodeStruct
+from tostr.core.context.config import ProjectConfig
 
 from tostr.exceptions import APIKeyError, StructNotFoundError, DatabaseNotFoundError
 
@@ -178,14 +179,16 @@ active_tasks = {}
 
 async def watch_async(target_path: Path, stop_event: asyncio.Event = None):
     llm = get_llm_client()
-    
+    config = ProjectConfig(target_path)
+
     logger.info("Starting Listener")
     try:
         async for changes in awatch(target_path, stop_event=stop_event):
-            for change_type, path in changes:
-                path = Path(path).relative_to(target_path)
-                if ".tostr" in str(path):
+            for change_type, raw_path in changes:
+                abs_path = Path(raw_path)
+                if config.is_ignored(abs_path):
                     continue
+                path = abs_path.relative_to(target_path)
                 
                 existing_task = active_tasks.get(path)
                 if existing_task and not existing_task.done():
@@ -251,7 +254,8 @@ async def process_single_file(project_dir: Path, filepath: Path, llm_client: LLM
         db = SQLiteCache(project_dir / ".tostr" / "cache.db")
         
         registry = Registry(db=db, use_cache=True, project_path=project_dir)
-        parser = BaseParser(filepath, llm_client, registry)
+        embedder = get_cached_embedding_client()
+        parser = BaseParser(filepath, llm=llm_client, embedder=embedder, registry=registry)
         
         parser.parse_path(filepath)
         
