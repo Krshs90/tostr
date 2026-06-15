@@ -213,7 +213,10 @@ __marimo__/
 
 *.sln
 
+# Ignore scratch/external test fixtures (large vendored libs, temp code), but keep
+# the small committed PythonTestProject used by the integration tests.
 tests/testcode/*
+!tests/testcode/PythonTestProject/
 
 # Tostr generated artifacts
 .tostr/
