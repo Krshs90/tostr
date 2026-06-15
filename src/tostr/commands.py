@@ -198,6 +198,9 @@ async def skeleton_async(subpath: str, project_path: Path, depth: int = 7, files
 active_tasks = {}
 
 async def watch_async(target_path: Path, stop_event: asyncio.Event = None):
+    # Resolve up front so symlinked roots (e.g. macOS /var -> /private/var) match the
+    # already-resolved paths that awatch emits; otherwise relative_to() below would raise.
+    target_path = Path(target_path).resolve()
     _verify_db_exists(target_path)
     try:
         llm = get_llm_client()
@@ -210,29 +213,34 @@ async def watch_async(target_path: Path, stop_event: asyncio.Event = None):
     try:
         async for changes in awatch(target_path, stop_event=stop_event):
             for change_type, raw_path in changes:
-                abs_path = Path(raw_path)
+                # Keep the absolute path: process_single_file opens the file directly, and
+                # the MCP server's cwd is not the project root, so a relative path can't be read.
+                abs_path = Path(raw_path).resolve()
                 if config.is_ignored(abs_path):
                     continue
-                path = abs_path.relative_to(target_path)
-                
-                existing_task = active_tasks.get(path)
+                try:
+                    display_path = abs_path.relative_to(target_path)
+                except ValueError:
+                    display_path = abs_path
+
+                existing_task = active_tasks.get(abs_path)
                 if existing_task and not existing_task.done():
                     existing_task.cancel()
-                
+
                 match change_type:
                     case Change.modified:
-                        logger.info(f"File modified: {path}")
+                        logger.info(f"File modified: {display_path}")
                     case Change.added:
-                        logger.info(f"File added: {path}")
+                        logger.info(f"File added: {display_path}")
                     case Change.deleted:
-                        logger.info(f"File deleted: {path}")
+                        logger.info(f"File deleted: {display_path}")
                         # TODO: handle deletions in the db
-                        
+
                 new_task = asyncio.create_task(
-                    process_single_file(target_path, path, llm)
+                    process_single_file(target_path, abs_path, llm)
                 )
-                active_tasks[path] = new_task
-                
+                active_tasks[abs_path] = new_task
+
     except (KeyboardInterrupt, asyncio.CancelledError):
         logger.info("\n🛑 Stopping listener...")
 
@@ -289,7 +297,10 @@ async def process_single_file(project_dir: Path, filepath: Path, llm_client: LLM
         await asyncio.to_thread(registry.save_to_cache, stale=True)
         logger.debug("Wrote Cache w/ stale descriptions")
 
-        await asyncio.to_thread(registry.propagate_hash_update, str(filepath))
+        # Struct UIDs are stored relative to the project root, so the hash-propagation
+        # lookup must use the relative path even though `filepath` may be absolute.
+        rel_uid = str(registry.relative_to_project(Path(filepath)))
+        await asyncio.to_thread(registry.propagate_hash_update, rel_uid)
         
         # resolve the descriptions and do the second cache write
         await parser.resolve_descriptions_async()
