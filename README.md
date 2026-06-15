@@ -95,13 +95,12 @@ In order to save environment variables on Windows, follow these steps.
 
 1. Press the windows key and type `environment variables`
 2. Click `Edit the system environment variables` to open the System Properties window.
-3. Click the `Environment Variables...` button at the bottom right.
-4. Decide where to store your variable.
+3. Decide where to store your variable.
     * **User variables**: Only accessible by your specific Windows account.
     * **System variables**: Accessible by all users on the computer (requires Administrator privileges).
-5. Click `New...` under the chosen section
-6. Enter `GEMINI_API_KEY` in the name, and paste your API key from the Google AI Studio
-7. Click OK on all open windows to save the settings.
+4. Click `New...` under the chosen section
+5. Enter `GEMINI_API_KEY` in the name, and paste your API key from the Google AI Studio
+6. Click OK on all open windows to save the settings.
 > Note: You must restart any open command prompts for them to recognize the new variable.
 
 ## Connecting the MCP to your agent
