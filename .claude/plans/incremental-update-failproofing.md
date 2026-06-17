@@ -1,0 +1,183 @@
+# Failproofing the Incremental AST Updater
+
+**Status:** in progress (started 2026-06-16)
+**Owner:** Avery
+**Why this matters:** the save-time incremental update loop is Tostr's core moat vs graphify. It must be ironclad — after *any* sequence of edits, the cached graph must be indistinguishable from a full re-parse.
+
+---
+
+## The definition of "done" (the golden invariant)
+
+The updater is failproof when, for any starting project and any sequence of file edits
+(add / modify / rename-member / remove-member / rename-file / delete-file / move-file),
+the incrementally-updated DB is **structurally identical** to a full `tostr init` re-parse of
+the final state — modulo descriptions/vectors, which are allowed to lag but never to dangle.
+
+Concrete integrity invariants that must hold after every update:
+
+1. **No dangling edges** — every `edges.source_id` and `edges.target_id` exists in `structs`.
+2. **No orphan structs** — every non-root struct has exactly one `is_child_of` edge to a parent that exists.
+3. **No orphan vectors** — every `vec_structs.struct_id` exists in `structs`.
+4. **No ghosts** — a struct removed from source has no row in `structs`, `edges` (either direction), or `vec_structs`.
+5. **Stable identity** — a cosmetic edit that doesn't change a symbol's resolution identity must not change its `id`, and must not churn any inbound edge.
+
+The acceptance test is a **golden-equivalence fuzz test** (Phase 8): apply random edits, diff
+`incremental.db` against `full_reparse.db`. Anything that's not description/vector content must match.
+
+---
+
+## Phase 0 — Lock the UID contract  ✳️ do first
+
+Identity is the foundation everything else builds on; nail the definition before touching code.
+
+- [ ] Rewrite §0 of `.skills/Creating_New_Language_Parser.md` with the **overload-key** framing:
+      the parenthetical suffix carries exactly what disambiguates same-named callables and nothing else.
+  - Python (no overloading): `file#Class.method(...)` — literal `(...)`, no params.
+  - Java (overloading): `file#Class.method(int, java.lang.String)` — ordered param **types**, no names, no return.
+- [ ] Fix the contradictory examples currently in §0 (they show param names *and* types incl. `self`).
+- [ ] State the new rules: field vs method disambiguated by presence of `(...)`; the parenthetical is
+      deterministic (reconstructable) so logical-name → method translation can append it.
+
+**Exit:** §0 reads as the single source of truth; both language sections below implement it verbatim.
+
+---
+
+## Phase 1 — Identity scheme (stable ids)
+
+Goal: cosmetic signature edits stop churning ids. This alone removes ~90% of the inbound-edge problem.
+
+- [x] **Python builder** (`languages/python/builders.py`): method uid → `file#Class.method(...)`.
+      Drop param names from the uid entirely; `arity` kept as a field (metadata), not in identity. (2026-06-16)
+- [x] **Java builder** (`languages/java/builders.py`): method uid → normalized param **types** via
+      `_normalize_java_param_type` (display signature kept separate/truncated). (2026-06-16)
+- [x] **Java type normalization** (`_normalize_java_param_type` + `_strip_java_package` in the Java builder,
+      2026-06-16): generics erased (`List<String>`→`List`), varargs→array (`String...`→`String[]`), whitespace
+      collapsed, no truncation, **and package qualifiers stripped to the simple/inner-class name**
+      (`java.lang.String`→`String`, `com.example.User`→`User`, `java.util.Map.Entry`→`Map.Entry`). Chose
+      package-*stripping* over FQN-*expansion*: a method is declared once so its UID is self-consistent; the
+      only win is spelling-stability under respelling edits, and stripping achieves that with no import map and
+      handles same-package/wildcard cases that expansion can't. Accepted limitation (rare): two distinct
+      same-simple-name types from different packages collapse — only bites FQN-in-source overloading on
+      identically-named classes. Done at build time because the overload key is part of the UID (the resolver
+      runs after UIDs exist, so it can't influence identity).
+- [ ] **Logical-name translation** (`registry._resolve_logical_name`): try `remainder` then
+      `remainder + "(...)"` so Python methods resolve directly (optional cleanup, now possible).
+- [ ] **Migration**: bump a DB/schema version marker; require `tostr init` re-parse (old `(self, rate)`
+      rows would otherwise orphan). Document in release notes.
+- [ ] Document `@typing.overload` stub collapse as accepted in `languages/python/dependency_patterns.md`.
+- [ ] Add uid-format unit tests (param rename → stable Python id; `process(int)` vs `process(String)` distinct Java ids).
+
+**Exit / tests:** uid-format unit tests per language; assert a param rename leaves the method `id` unchanged
+(Python) and that `process(int)` / `process(String)` get distinct ids (Java).
+
+---
+
+## Phase 2 — Diff-based cache sync (kills orphans + detachment)  ⛔ core
+
+Today `save_to_cache` only `INSERT OR REPLACE`s parsed structs and deletes edges by parsed source_id —
+removed members and their edges/vectors leak forever. Single-file reparse also drops the file's
+parent-directory edge.
+
+- [ ] New `sync_file_to_cache` (or extend `save_to_cache`): compute the set of ids currently stored for
+      this file's subtree (`WHERE path = ? OR path LIKE ?/%`), subtract freshly-parsed ids, and `DELETE`
+      the leftovers from `structs`, `edges` (**both** `source_id` and `target_id`), and `vec_structs`.
+- [ ] Fix **parent-directory detachment**: `parser.parse_path` single-file branch must attach the file to
+      its real parent `Directory` (resolve/create it) so the `is_child_of` edge is re-emitted.
+- [ ] Capture the set of ids that *changed* (old id in removed-set, new struct with same name/receiver) —
+      this is the worklist handed to Phase 4.
+
+**Exit / tests:** extend `tests/test_watch_live_update.py` — remove-method, rename-method, change-signature;
+assert the old struct row, its edges (both directions), and its vector are gone; assert the file still has
+its `is_child_of` parent edge after update.
+
+---
+
+## Phase 3 — Deletion handling
+
+`watch_async` logs `Change.deleted` but still routes it through `process_single_file`, which throws on the
+missing file and removes nothing.
+
+- [ ] Route `Change.deleted` to a dedicated DB-removal path (delete the file's whole subtree + edges + vectors).
+- [ ] Handle rename/move = `deleted(old) + added(new)`; ensure ordering is robust (added reparses, deleted purges).
+- [ ] Decide directory-deletion behavior (cascade purge of the subtree).
+
+**Exit / tests:** delete-file and rename-file cases; assert full subtree purge and no dangling inbound edges.
+
+---
+
+## Phase 4 — Inbound dependency re-resolution
+
+When a symbol's id genuinely changes (rename/move in Python; type/arity change in Java), its dependents
+must be repointed or dropped — never blanket-invalidated.
+
+- [ ] For each changed/removed id, gather inbound callers via `SELECT source_id FROM edges WHERE target_id = old_id`.
+- [ ] Load only those callers, re-run their recorded `dependency_names` against the new symbol table;
+      per edge, **rewrite** target to the new id (still matches) or **drop** it (genuinely broken call).
+- [ ] Never touch unrelated callers.
+
+**Exit / tests:** rename a called method → caller edge repointed; delete it → caller edge dropped;
+cosmetic edit → zero inbound churn (proves Phase 1 is doing its job).
+
+---
+
+## Phase 5 — Resolver arity robustness
+
+Exact arity matching already drops legitimate edges for defaults/varargs (independent of incremental).
+
+- [ ] Python: confirm name+receiver matching (arity loose) handles defaults, `*args`/`**kwargs`,
+      argparse-style call sites; add regression tests.
+- [ ] Java: match an arity *range* with varargs (`foo(int...)`), keep type-based overload selection.
+
+**Exit / tests:** `def foo(self, a, b=1)` resolves from both `foo(x)` and `foo(x, y)`; varargs resolves from any arity.
+
+---
+
+## Phase 6 — Description carry-over via diff_hash
+
+Leaf-only `diff_hash` (just simplified) now makes this clean. Today every save re-describes the whole file
+via LLM and blanks descriptions in the window between the two cache writes.
+
+- [ ] On reparse, if a struct's `diff_hash` (body hash) matches the stored row, carry over the existing
+      description instead of re-running the LLM.
+- [ ] Fix the two-phase write so existing descriptions are never blanked mid-update.
+
+**Exit / tests:** unchanged method keeps its description with **no** LLM call; only changed members re-describe.
+
+---
+
+## Phase 7 — Concurrency hardening
+
+- [ ] Serialize DB writes (single-writer queue) so a cancelled-but-in-flight `asyncio.to_thread` write
+      can't land *after* its replacement and resurrect stale data.
+- [ ] Guard each write to confirm the task is still the active one for its path before committing.
+
+**Exit / tests:** rapid successive saves of one file; concurrent saves of multiple files; assert final DB == last-write state.
+
+---
+
+## Phase 8 — Verification & guardrails
+
+- [ ] Add an **integrity checker** (the 5 invariants above) usable as a test assertion; consider exposing
+      it as `tostr doctor`.
+- [ ] **Golden-equivalence fuzz test**: random edit sequences; diff incremental DB vs full-reparse DB.
+- [ ] Run on a real open-source project; verify no orphans after a live editing session.
+
+**Exit:** golden-equivalence test passes over many random seeds; integrity checker clean on a real project.
+
+---
+
+## Dependency order
+
+```
+Phase 0 (contract)
+   └─ Phase 1 (identity)
+         └─ Phase 2 (diff-sync + detachment)  ── core
+               ├─ Phase 3 (deletions)
+               └─ Phase 4 (inbound re-resolution)
+Phase 5 (arity)        ─ independent, can land anytime
+Phase 6 (descriptions) ─ after Phase 2
+Phase 7 (concurrency)  ─ after Phase 2
+Phase 8 (verification) ─ last, but write the integrity checker early and run it after each phase
+```
+
+Phases 1–4 are the failproof-critical path. 5–7 are robustness/quality. 8 proves it.
